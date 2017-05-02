@@ -1,0 +1,9 @@
+{application, nkfile, [
+    {description, "NkFILE Plugin"},
+    {vsn, "develop"},
+    {modules, []},
+    {registered, []},
+    {mod, {nkfile_app, []}},
+    {applications, [nkservice, nkapi]},
+    {env, []}
+]}.
