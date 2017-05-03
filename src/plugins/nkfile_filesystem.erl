@@ -22,8 +22,7 @@
 
 -module(nkfile_filesystem).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
-
--compile(export_all).
+-export([upload/4, download/3, parse_store/1]).
 
 -include("nkfile.hrl").
 
@@ -39,6 +38,28 @@
 %% ===================================================================
 
 %% @doc
+upload(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}, Body) ->
+    Path2 = filename:join(Path, Id),
+    case file:write_file(Path2, Body) of
+        ok ->
+            {ok, #{path=>Path2}};
+        {error, Error} ->
+            {error, {file_write_error, Path2, nklib_util:to_binary(Error)}}
+    end.
+
+
+%% @doc
+download(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}) ->
+    Path2 = filename:join(Path, Id),
+    case file:read_file(Path2) of
+        {ok, Body} ->
+            {ok, Body};
+        {error, Error} ->
+            {error, {file_read_error, Path2, nklib_util:to_binary(Error)}}
+    end.
+
+
+%% @doc
 parse_store(Data) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
         {ok, #{class:=filesystem}, _, _} ->
@@ -46,7 +67,7 @@ parse_store(Data) ->
                 {ok, #{id:=Id, class:=filesystem} = Parsed, _, _} ->
                     Provider = #nkfile_store{
                         id = Id,
-                        class = smtp,
+                        class = filesystem,
                         config = maps:get(config, Parsed, #{})
                     },
                     {ok, Provider};
@@ -66,5 +87,13 @@ provider_syntax() ->
         config => #{
             path => binary
         },
-        '__mandatory' => [id, class, from, 'config.path']
+        '__mandatory' => [id, class, 'config.path']
     }.
+
+
+
+
+
+
+
+

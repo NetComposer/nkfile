@@ -24,8 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([plugin_deps/0]).
--export([nkfile_parse_store/1]).
-
+-export([nkfile_parse_store/1, nkfile_upload/4, nkfile_download/3]).
 
 -include("nkfile.hrl").
 
@@ -59,6 +58,14 @@ nkfile_parse_store(Data) ->
     nkfile_filesystem:parse_store(Data).
 
 
+%% @private
+nkfile_upload(SrvId, #nkfile_store{class=filesystem}=Store, File, Body) ->
+    nkfile_filesystem:upload(SrvId, Store, File, Body).
+
+
+%% @private
+nkfile_download(SrvId, #nkfile_store{class=filesystem}=Store, File) ->
+    nkfile_filesystem:download(SrvId, Store, File).
 
 
 

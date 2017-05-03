@@ -37,11 +37,14 @@
 }).
 
 
--record(nkfile_file, {
+-record(nkfile, {
     obj_id :: binary(),
     store_id :: nkfile:store_id(),
     name :: binary(),
     content_type :: binary(),
+    size :: integer(),
+    encryption :: atom(),
+    password :: binary(),
     debug :: boolean()
 }).
 

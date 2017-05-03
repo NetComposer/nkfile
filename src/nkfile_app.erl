@@ -54,7 +54,7 @@ start() ->
 start(_Type, _Args) ->
     ProvSyntax = nkfile_api_syntax:store_syntax(),
     Syntax = #{
-        store => {list, {syntax, ProvSyntax}}
+        stores => {list, {syntax, ProvSyntax}}
     },
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->

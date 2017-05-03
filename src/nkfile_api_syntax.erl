@@ -23,7 +23,8 @@
 -module(nkfile_api_syntax).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 -export([syntax/3]).
--export([store_syntax/0]).
+-export([file_syntax/0, store_syntax/0]).
+-export([parse_file_fun/2]).
 
 %% ===================================================================
 %% Syntax
@@ -34,6 +35,31 @@ syntax(_Sub, _Cmd, Syntax) ->
 
 
 
+%% ===================================================================
+%% File parsing
+%% ===================================================================
+
+%% @private
+file_syntax() ->
+    #{
+        id => binary,
+        store => binary,
+        name => binary,
+        content_type => fun ?MODULE:parse_file_fun/2,
+        encryption => {atom, [none, aes_cfb128]},
+        password => binary,
+        debug => boolean,
+        '__mandatory' => [store, name, content_type]
+    }.
+
+
+%% @private
+parse_file_fun(content_type, Val) ->
+    Val2 = to_bin(Val),
+    case binary:split(Val2, <<"/">>) of
+        [_, _] -> {ok, Val2};
+        _ -> error
+    end.
 
 
 
@@ -52,4 +78,4 @@ store_syntax() ->
 
 
 %% @private
-%%to_bin(T) -> nklib_util:to_binary(T).
+to_bin(T) -> nklib_util:to_binary(T).

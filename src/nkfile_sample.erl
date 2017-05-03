@@ -23,6 +23,25 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 -compile(export_all).
 
+-include("nkfile.hrl").
+
+
+up() ->
+    File = #{store=>local, name=>n1, content_type=><<"plain/text">>, id=>up1},
+    {ok, _, _} = nkfile:upload(root, File, <<"123">>),
+    {ok, _, <<"123">>} = nkfile:download(root, File).
+
+
+
+up2() ->
+    File = #{store=>local, name=>n1, content_type=><<"plain/text">>, encryption=>aes_cfb128, id=>up2},
+    {ok, #nkfile{password=Pass}, _} = nkfile:upload(root, File, <<"123">>),
+    {ok, _, <<"123">>} = nkfile:download(root, File#{password=>Pass}).
+
+
+
+
+
 
 login() ->
     nkdomain_sample:login().
