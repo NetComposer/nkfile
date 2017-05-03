@@ -29,18 +29,22 @@
 up() ->
     File = #{store=>local, name=>n1, content_type=><<"plain/text">>, id=>up1},
     {ok, _, _} = nkfile:upload(root, File, <<"123">>),
-    {ok, _, <<"123">>} = nkfile:download(root, File).
+    {ok, _, <<"123">>} = nkfile:download(root, File),
+
+    File2 = File#{name=>n2, encryption=>aes_cfb128, id=>up2},
+    {ok, #nkfile{password=Pass}, _} = nkfile:upload(root, File2, <<"321">>),
+    {error, decryption_error} = nkfile:download(root, File2),
+    {ok, _, <<"321">>} = nkfile:download(root, File2#{password=>Pass}).
 
 
+up_s3() ->
+    File = #{store=>'carlos.s3', name=>n1, content_type=><<"plain/text">>, id=>up1},
+    {ok, _, _} = nkfile:upload(root, File, <<"123">>),
+    {ok, _, <<"123">>} = nkfile:download(root, File),
 
-up2() ->
-    File = #{store=>local, name=>n1, content_type=><<"plain/text">>, encryption=>aes_cfb128, id=>up2},
-    {ok, #nkfile{password=Pass}, _} = nkfile:upload(root, File, <<"123">>),
-    {ok, _, <<"123">>} = nkfile:download(root, File#{password=>Pass}).
-
-
-
-
+    File2 = File#{name=>n2, encryption=>aes_cfb128, id=>up2},
+    {ok, #nkfile{password=Pass}, _} = nkfile:upload(root, File2, <<"321">>),
+    {ok, _, <<"321">>} = nkfile:download(root, File2#{password=>Pass}).
 
 
 login() ->

@@ -20,7 +20,7 @@
 
 %% @doc NkFILE callbacks
 
--module(nkfile_filesystem_callbacks).
+-module(nkfile_s3_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([plugin_deps/0]).
@@ -55,21 +55,20 @@ plugin_deps() ->
 
 %% @private
 nkfile_parse_store(Data) ->
-    nkfile_filesystem:parse_store(Data).
+    nkfile_s3:parse_store(Data).
 
 
 %% @private
-nkfile_upload(SrvId, #nkfile_store{class=filesystem}=Store, File, Body) ->
-    nkfile_filesystem:upload(SrvId, Store, File, Body);
+nkfile_upload(SrvId, #nkfile_store{class=s3}=Store, File, Body) ->
+    nkfile_s3:upload(SrvId, Store, File, Body);
 
 nkfile_upload(_SrvId, _Store, _File, _Body) ->
     continue.
 
 
-
 %% @private
-nkfile_download(SrvId, #nkfile_store{class=filesystem}=Store, File) ->
-    nkfile_filesystem:download(SrvId, Store, File);
+nkfile_download(SrvId, #nkfile_store{class=s3}=Store, File) ->
+    nkfile_s3:download(SrvId, Store, File);
 
 nkfile_download(_SrvId, _Store, _File) ->
     continue.
