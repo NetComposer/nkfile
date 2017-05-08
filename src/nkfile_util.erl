@@ -38,7 +38,7 @@
 parse_file(Msg) ->
     Syntax = nkfile_api_syntax:file_syntax(),
     case nklib_syntax:parse(Msg, Syntax) of
-        {ok, Parsed, _, []} ->
+        {ok, Parsed, []} ->
             #{
                 store := Store,
                 name := Name,
