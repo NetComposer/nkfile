@@ -52,9 +52,8 @@ start() ->
 
 %% @private OTP standard start callback
 start(_Type, _Args) ->
-    ProvSyntax = nkfile_api_syntax:store_syntax(),
     Syntax = #{
-        stores => {list, {syntax, ProvSyntax}}
+        stores => {list, nkfile_api_syntax:store_syntax()}
     },
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->

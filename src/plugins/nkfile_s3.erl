@@ -92,9 +92,10 @@ provider_syntax() ->
         config => #{
             bucket => binary,
             aws_id => binary,
-            aws_secret => binary
+            aws_secret => binary,
+            '__mandatory' => [bucket, aws_id, aws_secret]
         },
-        '__mandatory' => [id, class, 'config.bucket', 'config.aws_id', 'config.aws_secret']
+        '__mandatory' => [id, class, config]
     }.
 
 

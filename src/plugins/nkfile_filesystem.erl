@@ -85,9 +85,10 @@ provider_syntax() ->
         id => binary,
         class => atom,
         config => #{
-            path => binary
+            path => binary,
+            '__mandatory' => [path]
         },
-        '__mandatory' => [id, class, 'config.path']
+        '__mandatory' => [id, class, config]
     }.
 
 
