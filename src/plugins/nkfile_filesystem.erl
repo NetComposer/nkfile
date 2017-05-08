@@ -62,9 +62,9 @@ download(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}) ->
 %% @doc
 parse_store(Data) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
-        {ok, #{class:=filesystem}, _, _} ->
+        {ok, #{class:=filesystem}, _} ->
             case nklib_syntax:parse(Data, provider_syntax()) of
-                {ok, #{id:=Id, class:=filesystem} = Parsed, _, _} ->
+                {ok, #{id:=Id, class:=filesystem} = Parsed, _} ->
                     Provider = #nkfile_store{
                         id = Id,
                         class = filesystem,
