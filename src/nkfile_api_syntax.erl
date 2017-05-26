@@ -22,7 +22,7 @@
 
 -module(nkfile_api_syntax).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([syntax/3]).
+-export([syntax/2]).
 -export([file_syntax/0, store_syntax/0]).
 -export([parse_file_fun/2]).
 
@@ -30,7 +30,7 @@
 %% Syntax
 %% ===================================================================
 
-syntax(_Sub, _Cmd, Syntax) ->
+syntax(_Cmd, Syntax) ->
 	Syntax.
 
 

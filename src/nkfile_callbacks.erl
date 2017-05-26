@@ -27,7 +27,7 @@
 -export([api_error/1]).
 -export([nkfile_get_store/2, nkfile_parse_store/1, nkfile_get_body/3]).
 -export([nkfile_upload/4, nkfile_download/3]).
--export([api_server_cmd/2, api_server_syntax/3]).
+-export([service_api_cmd/2, service_api_syntax/2]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -151,17 +151,17 @@ nkfile_download(_SrvId, _Store, _File) ->
 %% ===================================================================
 
 %% @doc
-api_server_syntax(Syntax, #nkapi_req{class=file, subclass=Sub, cmd=Cmd}=Req, State) ->
-    {nkfile_api_syntax:syntax(Sub, Cmd, Syntax), Req, State};
+service_api_syntax(Syntax, #nkreq{cmd = <<"file", Cmd/binary>>}=Req) ->
+    {nkfile_api_syntax:syntax(Cmd, Syntax), Req};
 
-api_server_syntax(_Syntax, _Req, _State) ->
+service_api_syntax(_Syntax, _Req) ->
     continue.
 
 
 %% @doc
-api_server_cmd(#nkapi_req{class=file, subclass=Sub, cmd=Cmd}=Req, State) ->
-    nkfile_api:cmd(Sub, Cmd, Req, State);
+service_api_cmd(#nkreq{cmd = <<"file", Cmd/binary>>}=Req, State) ->
+    nkfile_api:cmd(Cmd, Req, State);
 
-api_server_cmd(_Req, _State) ->
+service_api_cmd(_Req, _State) ->
     continue.
 

@@ -22,7 +22,7 @@
 
 -module(nkfile_api).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([cmd/4]).
+-export([cmd/3]).
 
 -include_lib("nkapi/include/nkapi.hrl").
 
@@ -36,7 +36,7 @@
 %% Commands
 %% ===================================================================
 
-cmd(_Sub, _Cmd, _Data, State) ->
+cmd(_Cmd, _Req, State) ->
 	{error, not_implemented, State}.
 
 
