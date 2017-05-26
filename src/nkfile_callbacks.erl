@@ -24,7 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([plugin_deps/0, plugin_syntax/0, plugin_start/2, plugin_stop/2]).
--export([api_error/1]).
+-export([error/1]).
 -export([nkfile_get_store/2, nkfile_parse_store/1, nkfile_get_body/3]).
 -export([nkfile_upload/4, nkfile_download/3]).
 -export([service_api_cmd/2, service_api_syntax/2]).
@@ -72,16 +72,16 @@ plugin_stop(Config, #{id:=_SrvId}) ->
 %% ===================================================================
 
 %% @doc
-api_error(base64_decode_error)              -> "BASE64 decode error";
-api_error(decryption_error)                 -> "Decryption error";
-api_error(encryption_error)                 -> "Encryption error";
-api_error({file_read_error, Path, Error})   -> {"File read error at ~s: ~p", [Path, Error]};
-api_error({file_write_error, Path, Error})  -> {"File write error at ~s: ~p", [Path, Error]};
-api_error(invalid_file_body)                -> "Invalid file body";
-api_error(invalid_store)                    -> "Invalid store";
-api_error({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
-api_error(unknown_store)                    -> "Unknown store";
-api_error(_)                                -> continue.
+error(base64_decode_error)              -> "BASE64 decode error";
+error(decryption_error)                 -> "Decryption error";
+error(encryption_error)                 -> "Encryption error";
+error({file_read_error, Path, Error})   -> {"File read error at ~s: ~p", [Path, Error]};
+error({file_write_error, Path, Error})  -> {"File write error at ~s: ~p", [Path, Error]};
+error(invalid_file_body)                -> "Invalid file body";
+error(invalid_store)                    -> "Invalid store";
+error({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
+error(unknown_store)                    -> "Unknown store";
+error(_)                                -> continue.
 
 
 
