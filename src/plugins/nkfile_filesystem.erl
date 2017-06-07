@@ -38,22 +38,23 @@
 %% ===================================================================
 
 %% @doc
-upload(_SrvId, #{config:=#{path:=Path}}, #nkfile{obj_id=Id}, Body) ->
-    Path2 = filename:join(Path, Id),
+upload(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File, Body) ->
+    Path2 = filename:join(Path, Name),
     case file:write_file(Path2, Body) of
         ok ->
-            {ok, #{path=>Path2}};
+            Meta = maps:get(meta, File, #{}),
+            {ok, File#{meta=>Meta#{file_path=>Path2}}};
         {error, Error} ->
             {error, {file_write_error, Path2, nklib_util:to_binary(Error)}}
     end.
 
 
 %% @doc
-download(_SrvId, #{config:=#{path:=Path}}, #nkfile{obj_id=Id}) ->
-    Path2 = filename:join(Path, Id),
+download(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File) ->
+    Path2 = filename:join(Path, Name),
     case file:read_file(Path2) of
-        {ok, Body} ->
-            {ok, Body};
+        {ok, File, Body} ->
+            {ok, File, Body};
         {error, Error} ->
             {error, {file_read_error, Path2, nklib_util:to_binary(Error)}}
     end.
@@ -76,13 +77,12 @@ parse_store(Data, ParseOpts) ->
 
 %% @private
 store_syntax() ->
-    #{
-        class => atom,
-        config => #{
+    Base = nkfile_util:store_syntax(),
+    Base#{
+        config := #{
             path => binary,
             '__mandatory' => [path]
-        },
-        '__mandatory' => [class, config]
+        }
     }.
 
 

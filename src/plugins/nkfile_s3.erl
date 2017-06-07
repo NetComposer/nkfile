@@ -39,11 +39,12 @@
 %% ===================================================================
 
 %% @doc
-upload(_SrvId, Store, #nkfile{obj_id=Id}, Body) ->
+upload(_SrvId, Store, #{name:=Name}=File, Body) ->
     {Bucket, AwsConfig} = get_config(Store),
     try
-        Res = erlcloud_s3:put_object(Bucket, to_list(Id), Body, [], AwsConfig),
-        {ok, #{res=>Res}}
+        Res = erlcloud_s3:put_object(Bucket, to_list(Name), Body, [], AwsConfig),
+        Meta = maps:get(meta, File, #{}),
+        {ok, File#{meta=>Meta#{aws_res=>Res}}}
     catch
         error:Error ->
             {error, {s3_error, nklib_util:to_binary(Error)}}
@@ -51,12 +52,12 @@ upload(_SrvId, Store, #nkfile{obj_id=Id}, Body) ->
 
 
 %% @doc
-download(_SrvId, Store, #nkfile{obj_id=Id}) ->
+download(_SrvId, Store, #{name:=Name}=File) ->
     {Bucket, AwsConfig} = get_config(Store),
     try
-        Res = erlcloud_s3:get_object(Bucket, to_list(Id), [], AwsConfig),
+        Res = erlcloud_s3:get_object(Bucket, to_list(Name), [], AwsConfig),
         Body = nklib_util:get_value(content, Res),
-        {ok, Body}
+        {ok, File, Body}
     catch
         error:Error ->
             {error, {s3_error, nklib_util:to_binary(Error)}}
@@ -81,15 +82,14 @@ parse_store(Data, ParseOpts) ->
 
 %% @private
 store_syntax() ->
-    #{
-        class => atom,
-        config => #{
+    Base = nkfile_util:store_syntax(),
+    Base#{
+        config := #{
             bucket => binary,
             aws_id => binary,
             aws_secret => binary,
             '__mandatory' => [bucket, aws_id, aws_secret]
-        },
-        '__mandatory' => [class, config]
+        }
     }.
 
 
@@ -101,7 +101,7 @@ get_config(#{config:=Config}) ->
         access_key_id = to_list(AwsId),
         secret_access_key = to_list(AwsSecret),
         s3_follow_redirect = true
-%%        s3_host=Host,     "nkobjects.s3.eu-central-1.amazonaws.com"
+        %% s3_host=Host,     "nkobjects.s3.eu-central-1.amazonaws.com"
     },
     {to_list(Bucket), AwsConfig}.
 

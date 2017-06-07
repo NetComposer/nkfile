@@ -22,7 +22,7 @@
 
 -module(nkfile_util).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([parse_file/1, encrypt/2, decrypt/2]).
+-export([store_syntax/0, file_syntax/0, get_body/1, encrypt/3, decrypt/3]).
 
 -include("nkfile.hrl").
 
@@ -35,64 +35,76 @@
 
 
 %% @doc
-parse_file(Msg) ->
-    Syntax = nkfile_api_syntax:file_syntax(),
-    case nklib_syntax:parse(Msg, Syntax) of
-        {ok, Parsed, []} ->
-            #{
-                store := Store,
-                name := Name,
-                content_type := CT
-            } = Parsed,
-            ObjId = case maps:find(id, Parsed) of
-                {ok, UserObjId} -> UserObjId;
-                error -> nklib_util:luid()
-            end,
-            File = #nkfile{
-                obj_id = ObjId,
-                store_id = Store,
-                name = Name,
-                content_type = CT,
-                encryption = maps:get(encryption, Parsed, none),
-                password = maps:get(password, Parsed, <<>>),
-                debug = maps:get(debug, Parsed, false)
-            },
-            {ok, File};
-        {ok, _Parsed, _, [Key|_]} ->
-            {error, {unknown_field, Key}};
-        {error, Error} ->
-            {error, Error}
-    end.
+store_syntax() ->
+    #{
+        class => atom,
+        encryption => atom,
+        config => map,
+        '__mandatory' => [class, config]
+    }.
 
 
 %% @doc
-encrypt(#nkfile{encryption=none}=File, FileBody) ->
-    {ok, File#nkfile{size=byte_size(FileBody)}, FileBody};
+file_syntax() ->
+    #{
+        store_id => binary,
+        name => binary,
+        password => binary,
+        debug => boolean,
+        '__mandatory' => [store_id, name]
+    }.
 
-encrypt(#nkfile{encryption=aes_cfb128}=File, FileBody) ->
+
+
+%% @doc
+get_body({base64, Base64}) ->
+    case catch base64:decode(Base64) of
+        {'EXIT', _} ->
+            {error, base64_decode_error};
+        Bin ->
+            {ok, Bin}
+    end;
+
+get_body(Bin) when is_binary(Bin) ->
+    {ok, Bin};
+
+get_body(_FileBody) ->
+    {error, invalid_file_body}.
+
+
+
+%% @doc
+encrypt(#{encryption:=aes_cfb128}, File, FileBody) ->
     Pass = crypto:strong_rand_bytes(16),
     case catch crypto:block_encrypt(aes_cfb128, Pass, ?IV, FileBody) of
         {'EXIT', _} ->
             {error, encryption_error};
         Enc ->
-            {ok, File#nkfile{size=byte_size(FileBody), password=Pass}, Enc}
+            {ok, File#{password=>Pass}, Enc}
     end;
 
-encrypt(_, _) ->
-    {error, encryption_error}.
+encrypt(#{encryption:=Algo}, _File, _FileBody) ->
+    {error, {unknown_encryption_algo, Algo}};
+
+encrypt(_Store, File, FileBody) ->
+    {ok, File, FileBody}.
+
 
 
 %% @doc
-decrypt(#nkfile{encryption=none}=File, FileBody) ->
-    {ok, File#nkfile{size=byte_size(FileBody)}, FileBody};
-
-decrypt(#nkfile{encryption=aes_cfb128, password=Pass}=File, Enc) ->
+decrypt(#{encryption:=aes_cfb128}, #{password:=Pass}=File, Enc) ->
     case catch crypto:block_decrypt(aes_cfb128, Pass, ?IV, Enc) of
         {'EXIT', _} ->
             {error, decryption_error};
         FileBody ->
-            {ok, File#nkfile{size=byte_size(FileBody)}, FileBody}
+            {ok, File, FileBody}
     end;
 
-decrypt(_, _) ->
-    {error, decryption_error}.
+decrypt(#{encryption:=aes_cfb128}, _File, _Enc) ->
+    {error, missing_password};
+
+decrypt(#{encryption:=Algo}, _File, _FileBody) ->
+    {error, {unknown_encryption_algo, Algo}};
+
+decrypt(_Store, File, FileBody) ->
+    {ok, File, FileBody}.
