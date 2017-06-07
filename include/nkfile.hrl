@@ -30,11 +30,11 @@
 %% Records
 %% ===================================================================
 
--record(nkfile_store, {
-    id :: nkfile:store_id(),
-    class :: nkfile:store_class(),
-    config :: term()
-}).
+%%-record(nkfile_store, {
+%%    id :: nkfile:store_id(),
+%%    class :: nkfile:store_class(),
+%%    config :: term()
+%%}).
 
 
 -record(nkfile, {

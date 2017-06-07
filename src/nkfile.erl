@@ -24,6 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([upload/3, download/2]).
+-export([parse_store/2, parse_store/3]).
 -export_type([store_id/0, store_class/0]).
 -include("nkfile.hrl").
 
@@ -38,7 +39,6 @@
 
 -type file() ::
     #{
-        obj_id => binary(),
         store_id => store_id(),
         name => binary(),
         content_type => binary(),
@@ -46,6 +46,9 @@
         password => binary(),
         debug => boolean()
     }.
+
+-type store() :: map().
+
 
 -type file_body() :: {base64, binary()} | binary() | term().
 
@@ -127,6 +130,29 @@ download(Srv, Msg) ->
     end.
 
 
+%% @doc Parses a store
+-spec parse_store(nkservice:id(), map()) ->
+    {ok, store()} | {error, term()}.
+
+parse_store(Srv, Map) ->
+    parse_store(Srv, Map, #{}).
+
+
+-spec parse_store(nkservice:id(), map(), nklib_syntax:parse_opts()) ->
+    {ok, store()} | {error, term()}.
+
+parse_store(Srv, Map, ParseOpts) ->
+    case nkservice_srv:get_srv_id(Srv) of
+        {ok, SrvId} ->
+            case SrvId:nkfile_parse_store(Map, ParseOpts) of
+                {ok, Store} ->
+                    {ok, Store};
+                {error, Error} ->
+                    {error, Error}
+            end;
+        not_found ->
+            {error, service_not_found}
+    end.
 
 
 

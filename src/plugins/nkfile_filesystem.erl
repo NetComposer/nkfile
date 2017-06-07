@@ -22,7 +22,7 @@
 
 -module(nkfile_filesystem).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([upload/4, download/3, parse_store/1]).
+-export([upload/4, download/3, parse_store/2]).
 
 -include("nkfile.hrl").
 
@@ -38,7 +38,7 @@
 %% ===================================================================
 
 %% @doc
-upload(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}, Body) ->
+upload(_SrvId, #{config:=#{path:=Path}}, #nkfile{obj_id=Id}, Body) ->
     Path2 = filename:join(Path, Id),
     case file:write_file(Path2, Body) of
         ok ->
@@ -49,7 +49,7 @@ upload(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}, Body) ->
 
 
 %% @doc
-download(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}) ->
+download(_SrvId, #{config:=#{path:=Path}}, #nkfile{obj_id=Id}) ->
     Path2 = filename:join(Path, Id),
     case file:read_file(Path2) of
         {ok, Body} ->
@@ -60,17 +60,12 @@ download(_SrvId, #nkfile_store{config=#{path:=Path}}, #nkfile{obj_id=Id}) ->
 
 
 %% @doc
-parse_store(Data) ->
+parse_store(Data, ParseOpts) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
         {ok, #{class:=filesystem}, _} ->
-            case nklib_syntax:parse(Data, provider_syntax()) of
-                {ok, #{id:=Id, class:=filesystem} = Parsed, _} ->
-                    Provider = #nkfile_store{
-                        id = Id,
-                        class = filesystem,
-                        config = maps:get(config, Parsed, #{})
-                    },
-                    {ok, Provider};
+            case nklib_syntax:parse(Data, store_syntax(), ParseOpts) of
+                {ok, Store, _} ->
+                    {ok, Store};
                 {error, Error} ->
                     {error, Error}
             end;
@@ -80,15 +75,14 @@ parse_store(Data) ->
 
 
 %% @private
-provider_syntax() ->
+store_syntax() ->
     #{
-        id => binary,
         class => atom,
         config => #{
             path => binary,
             '__mandatory' => [path]
         },
-        '__mandatory' => [id, class, config]
+        '__mandatory' => [class, config]
     }.
 
 

@@ -25,11 +25,10 @@
 -behaviour(application).
 
 -export([start/0, start/2, stop/1]).
--export([get/1, get/2, put/2, del/1, get_store/1]).
--export([get_env/1, get_env/2, set_env/2]).
+-export([get_store_ids/0, get_store/1, put_store/2]).
+-export([get/1, get/2, put/2, del/1]).
 
 -include("nkfile.hrl").
-%%-include_lib("nklib/include/nklib.hrl").
 
 -define(APP, nkfile).
 -compile({no_auto_import,[get/1, put/2]}).
@@ -52,13 +51,10 @@ start() ->
 
 %% @private OTP standard start callback
 start(_Type, _Args) ->
-    Syntax = #{
-        stores => {list, nkfile_api_syntax:store_syntax()}
-    },
+    Syntax = #{stores => {list, map}},
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->
             {ok, Vsn} = application:get_key(?APP, vsn),
-            set_stores(),
             lager:info("NkFILE v~s is starting", [Vsn]),
             {ok, Pid} = nkfile_sup:start_link(),
             {ok, Pid};
@@ -73,21 +69,21 @@ stop(_) ->
     ok.
 
 
-%% @private
-set_stores() ->
-    lists:foreach(
-        fun(#{id:=Id}=Store) -> put({store, Id}, Store) end,
-        get(stores, [])).
+%% @doc
+get_store_ids() ->
+    get(store_ids, []).
 
 
 %% @doc
 get_store(Id) ->
-    case get({store, Id}) of
-        undefined ->
-            not_found;
-        #{}=Store ->
-            {ok, Store}
-    end.
+    get({store, nklib_util:to_binary(Id)}, not_found).
+
+
+%% @doc
+put_store(Id, Store) ->
+    Ids = get(store_ids, []),
+    put(store_ids, nklib_util:store_value(nklib_util:to_binary(Id), Ids)),
+    put({store, Id}, Store).
 
 
 
@@ -103,25 +99,6 @@ put(Key, Val) ->
 
 del(Key) ->
     nklib_config:del(?APP, Key).
-
-
-
-%% @private
-get_env(Key) ->
-    get_env(Key, undefined).
-
-
-%% @private
-get_env(Key, Default) ->
-    case application:get_env(?APP, Key) of
-        undefined -> Default;
-        {ok, Value} -> Value
-    end.
-
-
-%% @private
-set_env(Key, Value) ->
-    application:set_env(?APP, Key, Value).
 
 
 

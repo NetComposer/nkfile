@@ -22,7 +22,7 @@
 
 -module(nkfile_s3).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([upload/4, download/3, parse_store/1]).
+-export([upload/4, download/3, parse_store/2]).
 
 -include("nkfile.hrl").
 -include_lib("erlcloud/include/erlcloud_aws.hrl").
@@ -65,17 +65,12 @@ download(_SrvId, Store, #nkfile{obj_id=Id}) ->
 
 
 %% @doc
-parse_store(Data) ->
+parse_store(Data, ParseOpts) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
         {ok, #{class:=s3}, _} ->
-            case nklib_syntax:parse(Data, provider_syntax()) of
-                {ok, #{id:=Id, class:=s3} = Parsed, _} ->
-                    Provider = #nkfile_store{
-                        id = Id,
-                        class = s3,
-                        config = maps:get(config, Parsed, #{})
-                    },
-                    {ok, Provider};
+            case nklib_syntax:parse(Data, store_syntax(), ParseOpts) of
+                {ok, Store, _} ->
+                    {ok, Store};
                 {error, Error} ->
                     {error, Error}
             end;
@@ -85,9 +80,8 @@ parse_store(Data) ->
 
 
 %% @private
-provider_syntax() ->
+store_syntax() ->
     #{
-        id => binary,
         class => atom,
         config => #{
             bucket => binary,
@@ -95,13 +89,13 @@ provider_syntax() ->
             aws_secret => binary,
             '__mandatory' => [bucket, aws_id, aws_secret]
         },
-        '__mandatory' => [id, class, config]
+        '__mandatory' => [class, config]
     }.
 
 
 
 %% @private
-get_config(#nkfile_store{config=Config}) ->
+get_config(#{config:=Config}) ->
     #{bucket:=Bucket, aws_id:=AwsId, aws_secret:=AwsSecret} = Config,
     AwsConfig = #aws_config{
         access_key_id = to_list(AwsId),

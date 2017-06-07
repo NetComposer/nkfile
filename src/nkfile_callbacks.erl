@@ -23,9 +23,9 @@
 -module(nkfile_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0, plugin_syntax/0, plugin_start/2, plugin_stop/2]).
+-export([plugin_deps/0, plugin_syntax/0, service_init/2]).
 -export([error/1]).
--export([nkfile_get_store/2, nkfile_parse_store/1, nkfile_get_body/3]).
+-export([nkfile_get_store/2, nkfile_parse_store/2, nkfile_get_body/3]).
 -export([nkfile_upload/4, nkfile_download/3]).
 -export([service_api_cmd/2, service_api_syntax/2]).
 
@@ -59,12 +59,25 @@ plugin_syntax() ->
 	}.
 
 
-plugin_start(Config, #{id:=_SrvId}) ->
-	{ok, Config}.
 
+service_init(_Service, #{id:=SrvId}=State) ->
+    % Loads app stores
+    lists:foreach(
+        fun
+            (#{id:=Id}=Data) ->
+                case nkfile:parse_store(SrvId, Data) of
+                    {ok, Store} ->
+                        lager:info("NkFILE: loading store ~s", [Id]),
+                        nkfile_app:put_store(nklib_util:to_binary(Id), Store);
+                    {error, Error} ->
+                        lager:warning("NkFILE: could not load store ~p: ~p", [Data, Error])
+                end;
+            (Data) ->
+                lager:warning("NkFILE: invalid store: ~p", [Data])
+        end,
+        nkfile_app:get(stores, [])),
+    {ok, State}.
 
-plugin_stop(Config, #{id:=_SrvId}) ->
-    {ok, Config}.
 
 
 %% ===================================================================
@@ -90,24 +103,25 @@ error(_)                                -> continue.
 %% ===================================================================
 
 
+
 %% @doc Gets a store
 -spec nkfile_get_store(nkservice:id(), nkfile:store_id()) ->
-    {ok, #nkfile_store{}} | {error, term()}.
+    {ok, map()} | {error, term()}.
 
-nkfile_get_store(SrvId, Id) ->
-    case nkfile_app:get_store(nklib_util:to_binary(Id)) of
-        {ok, Map} ->
-            SrvId:nkfile_parse_store(Map);
+nkfile_get_store(_SrvId, Id) ->
+    case nkfile_app:get_store(Id) of
         not_found ->
-            {error, {store_not_found, Id}}
+            {error, {store_not_found, Id}};
+        {ok, Store} ->
+            {ok, Store}
     end.
 
 
 %% @doc Parses a store
--spec nkfile_parse_store(map()) ->
-    {ok, #nkfile_store{}} | {error, term()}.
+-spec nkfile_parse_store(map(), nklib_syntax:parse_opts()) ->
+    {ok, map()} | {error, term()}.
 
-nkfile_parse_store(_Provider) ->
+nkfile_parse_store(_Store, _Opts) ->
     {error, invalid_store}.
 
 
