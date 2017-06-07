@@ -82,7 +82,7 @@ encrypt(#{encryption:=aes_cfb128}, File, FileBody) ->
         Enc ->
             lager:error("ENC"),
 
-            {ok, File#{password=>Pass}, Enc}
+            {ok, File#{password=>base64:encode(Pass)}, Enc}
     end;
 
 encrypt(#{encryption:=Algo}, _File, _FileBody) ->
@@ -95,7 +95,8 @@ encrypt(_Store, File, FileBody) ->
 
 %% @doc
 decrypt(#{encryption:=aes_cfb128}, #{password:=Pass}=File, Enc) ->
-    case catch crypto:block_decrypt(aes_cfb128, Pass, ?IV, Enc) of
+    Pass2 = base64:decode(Pass),
+    case catch crypto:block_decrypt(aes_cfb128, Pass2, ?IV, Enc) of
         {'EXIT', _} ->
             {error, decryption_error};
         FileBody ->
