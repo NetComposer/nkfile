@@ -93,7 +93,6 @@ error({file_write_error, Path, Error})  -> {"File write error at ~s: ~p", [Path,
 error(invalid_file_body)                -> "Invalid file body";
 error(invalid_store)                    -> "Invalid store";
 error({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
-error(unknown_store)                    -> "Unknown store";
 error(_)                                -> continue.
 
 
@@ -119,7 +118,7 @@ nkfile_get_store(_SrvId, Id) ->
 
 %% @doc Parses a store
 -spec nkfile_parse_store(map(), nklib_syntax:parse_opts()) ->
-    {ok, map()} | {error, term()}.
+    {ok, map(), [binary()]} | {error, term()}.
 
 nkfile_parse_store(_Store, _Opts) ->
     {error, invalid_store}.
@@ -149,7 +148,7 @@ nkfile_get_body(_SrvId, _Store, _FileBody) ->
     {ok, Meta::map()} | {error, term()}.
 
 nkfile_upload(_SrvId, _Store, _File, _Body) ->
-    {error, unknown_store}.
+    {error, invalid_store}.
 
 
 %% @doc Retrieves the file
@@ -157,7 +156,7 @@ nkfile_upload(_SrvId, _Store, _File, _Body) ->
     {ok, binary()} | {error, term()}.
 
 nkfile_download(_SrvId, _Store, _File) ->
-    {error, unknown_store}.
+    {error, invalid_store}.
 
 
 %% ===================================================================

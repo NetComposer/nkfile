@@ -139,14 +139,14 @@ parse_store(Srv, Map) ->
 
 
 -spec parse_store(nkservice:id(), map(), nklib_syntax:parse_opts()) ->
-    {ok, store()} | {error, term()}.
+    {ok, store(), [binary()]} | {error, term()}.
 
 parse_store(Srv, Map, ParseOpts) ->
     case nkservice_srv:get_srv_id(Srv) of
         {ok, SrvId} ->
             case SrvId:nkfile_parse_store(Map, ParseOpts) of
-                {ok, Store} ->
-                    {ok, Store};
+                {ok, Store, UnknownFields} ->
+                    {ok, Store, UnknownFields};
                 {error, Error} ->
                     {error, Error}
             end;

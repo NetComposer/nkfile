@@ -69,8 +69,8 @@ parse_store(Data, ParseOpts) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
         {ok, #{class:=s3}, _} ->
             case nklib_syntax:parse(Data, store_syntax(), ParseOpts) of
-                {ok, Store, _} ->
-                    {ok, Store};
+                {ok, Store, UnknownFields} ->
+                    {ok, Store, UnknownFields};
                 {error, Error} ->
                     {error, Error}
             end;
