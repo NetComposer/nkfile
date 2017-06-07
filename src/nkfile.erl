@@ -24,7 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([upload/3, download/2]).
--export([parse_store/2, parse_store/3, parse_file/2, parse_file/3]).
+-export([get_store/2, parse_store/2, parse_store/3, parse_file/2, parse_file/3]).
 -export_type([store_id/0, store_class/0]).
 -include("nkfile.hrl").
 
@@ -70,7 +70,7 @@
 upload(Srv, #{store_id:=StoreId}=File, FileBody) ->
     case nkservice_srv:get_srv_id(Srv) of
         {ok, SrvId} ->
-            case SrvId:nkfile_get_store(SrvId, StoreId) of
+            case get_store(SrvId, StoreId) of
                 {ok, Store} ->
                     case nkfile_util:get_body(FileBody) of
                         {ok, BinBody} ->
@@ -98,10 +98,10 @@ upload(Srv, #{store_id:=StoreId}=File, FileBody) ->
 download(Srv, #{store_id:=StoreId}=File) ->
     case nkservice_srv:get_srv_id(Srv) of
         {ok, SrvId} ->
-            case SrvId:nkfile_get_store(SrvId, StoreId) of
+            case get_store(SrvId, StoreId) of
                 {ok, Store} ->
                     case SrvId:nkfile_download(SrvId, Store, File) of
-                        {ok, Enc} ->
+                        {ok, File, Enc} ->
                             nkfile_util:decrypt(Store, File, Enc);
                         {error, Error} ->
                             {error, Error}
@@ -112,6 +112,14 @@ download(Srv, #{store_id:=StoreId}=File) ->
         not_found ->
             {error, service_not_found}
     end.
+
+
+%% @doc
+-spec get_store(nkservice:id(), store_id()) ->
+    {ok, store()} | {error, term()}.
+
+get_store(SrvId, StoreId) ->
+    SrvId:nkfile_get_store(SrvId, StoreId).
 
 
 %% @doc Parses a store

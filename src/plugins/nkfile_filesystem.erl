@@ -53,7 +53,7 @@ upload(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File, Body) ->
 download(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File) ->
     Path2 = filename:join(Path, Name),
     case file:read_file(Path2) of
-        {ok, File, Body} ->
+        {ok, Body} ->
             {ok, File, Body};
         {error, Error} ->
             {error, {file_read_error, Path2, nklib_util:to_binary(Error)}}

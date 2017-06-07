@@ -31,9 +31,9 @@ up() ->
     {ok, _} = nkfile:upload(root, File1, <<"123">>),
     {ok, _, <<"123">>} = nkfile:download(root, File1),
 
-    File2 = #{store_id=>local, name=>n2, encryption=>aes_cfb128},
+    File2 = #{store_id=>local_secure, name=>n2},
     {ok, #{password:=_}=File3} = nkfile:upload(root, File2, <<"321">>),
-    {error, decryption_error} = nkfile:download(root, File2),
+    {error, missing_password} = nkfile:download(root, File2),
     {ok, _, <<"321">>} = nkfile:download(root, File3).
 
 
@@ -42,9 +42,9 @@ up_s3() ->
     {ok, _} = nkfile:upload(root, File1, <<"123">>),
     {ok, _, <<"123">>} = nkfile:download(root, File1),
 
-    File2 = #{store_id=>'carlos.s3', name=>n2, encryption=>aes_cfb128},
+    File2 = #{store_id=>'carlos.s3_secure', name=>n2},
     {ok, #{password:=_}=File3} = nkfile:upload(root, File2, <<"321">>),
-    {error, decryption_error} = nkfile:download(root, File2),
+    {error, missing_password} = nkfile:download(root, File2),
     {ok, _, <<"321">>} = nkfile:download(root, File3).
 
 

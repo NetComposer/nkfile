@@ -64,7 +64,7 @@ service_init(_Service, #{id:=SrvId}=State) ->
         fun
             (#{id:=Id}=Data) ->
                 case nkfile:parse_store(SrvId, Data) of
-                    {ok, Store} ->
+                    {ok, Store, _} ->
                         lager:info("NkFILE: loading store ~s", [Id]),
                         nkfile_app:put_store(nklib_util:to_binary(Id), Store);
                     {error, Error} ->
@@ -110,7 +110,7 @@ nkfile_get_store(_SrvId, Id) ->
     case nkfile_app:get_store(Id) of
         not_found ->
             {error, {store_not_found, Id}};
-        {ok, Store} ->
+        Store ->
             {ok, Store}
     end.
 
