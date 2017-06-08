@@ -45,7 +45,8 @@ upload(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File, Body) ->
             Meta = maps:get(meta, File, #{}),
             {ok, File#{meta=>Meta#{file_path=>Path2}}};
         {error, Error} ->
-            {error, {file_write_error, Path2, nklib_util:to_binary(Error)}}
+            lager:warning("NkFILE write error at ~s: ~p", [Path2, Error]),
+            {error, file_write_error}
     end.
 
 
@@ -56,7 +57,8 @@ download(_SrvId, #{config:=#{path:=Path}}, #{name:=Name}=File) ->
         {ok, Body} ->
             {ok, File, Body};
         {error, Error} ->
-            {error, {file_read_error, Path2, nklib_util:to_binary(Error)}}
+            lager:warning("NkFILE read error at ~s: ~p", [Path2, Error]),
+            {error, file_read_error}
     end.
 
 

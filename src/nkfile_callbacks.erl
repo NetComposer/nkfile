@@ -86,8 +86,8 @@ service_init(_Service, #{id:=SrvId}=State) ->
 error(base64_decode_error)              -> "BASE64 decode error";
 error(decryption_error)                 -> "Decryption error";
 error(encryption_error)                 -> "Encryption error";
-error({file_read_error, Path, Error})   -> {"File read error at ~s: ~p", [Path, Error]};
-error({file_write_error, Path, Error})  -> {"File write error at ~s: ~p", [Path, Error]};
+error(file_read_error)                  -> "File read error";
+error(file_write_error)                 -> "File write error";
 error(invalid_file_body)                -> "Invalid file body";
 error(invalid_store)                    -> "Invalid store";
 error({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
