@@ -80,8 +80,6 @@ encrypt(#{encryption:=aes_cfb128}, File, FileBody) ->
         {'EXIT', _} ->
             {error, encryption_error};
         Enc ->
-            lager:error("ENC"),
-
             {ok, File#{password=>base64:encode(Pass)}, Enc}
     end;
 
