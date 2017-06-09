@@ -50,6 +50,7 @@
 -type store() ::
     #{
         class => store_class(),
+        max_size => integer(),
         encryption => undefined | aes_cfb128,
         config => map()
     }.
@@ -72,7 +73,7 @@ upload(Srv, #{store_id:=StoreId}=File, FileBody) ->
         {ok, SrvId} ->
             case get_store(SrvId, StoreId) of
                 {ok, Store} ->
-                    case nkfile_util:get_body(FileBody) of
+                    case nkfile_util:get_body(Store, FileBody) of
                         {ok, BinBody} ->
                             case nkfile_util:encrypt(Store, File, BinBody) of
                                 {ok, File2, BinBody2} ->

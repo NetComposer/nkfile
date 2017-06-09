@@ -22,7 +22,7 @@
 
 -module(nkfile_util).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([store_syntax/0, file_syntax/0, get_body/1, encrypt/3, decrypt/3]).
+-export([store_syntax/0, file_syntax/0, get_body/2, encrypt/3, decrypt/3]).
 
 -include("nkfile.hrl").
 
@@ -39,6 +39,7 @@ store_syntax() ->
     #{
         class => atom,
         encryption => atom,
+        max_file_size => {integer, 0, none},
         config => map,
         '__mandatory' => [class, config]
     }.
@@ -57,18 +58,23 @@ file_syntax() ->
 
 
 %% @doc
-get_body({base64, Base64}) ->
+get_body(Store, {base64, Base64}) ->
     case catch base64:decode(Base64) of
         {'EXIT', _} ->
             {error, base64_decode_error};
         Bin ->
+            get_body(Store, Bin)
+    end;
+
+get_body(Store, Bin) when is_binary(Bin) ->
+    case Store of
+        #{max_file_size:=Max} when byte_size(Bin) > Max ->
+            {error, file_too_large};
+        _ ->
             {ok, Bin}
     end;
 
-get_body(Bin) when is_binary(Bin) ->
-    {ok, Bin};
-
-get_body(_FileBody) ->
+get_body(_Store, _FileBody) ->
     {error, invalid_file_body}.
 
 
