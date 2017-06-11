@@ -22,7 +22,7 @@
 
 -module(nkfile_s3).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--export([upload/4, download/3, parse_store/2]).
+-export([upload/4, download/3, parse_store/2, store_syntax/0]).
 
 -include("nkfile.hrl").
 -include_lib("erlcloud/include/erlcloud_aws.hrl").
