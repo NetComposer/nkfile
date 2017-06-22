@@ -23,7 +23,7 @@
 -module(nkfile).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([upload/3, download/2]).
+-export([upload/3, upload/4, download/2, download/3]).
 -export([get_store/2, parse_store/2, parse_store/3, parse_file/2, parse_file/3]).
 -export_type([store_id/0, store_class/0]).
 -include("nkfile.hrl").
@@ -68,27 +68,30 @@
 -spec upload(nkservice:id(), file(), file_body()) ->
     {ok, file()} | {error, term()}.
 
-upload(Srv, #{store_id:=StoreId}=File, FileBody) ->
-    case nkservice_srv:get_srv_id(Srv) of
-        {ok, SrvId} ->
-            case get_store(SrvId, StoreId) of
-                {ok, Store} ->
-                    case nkfile_util:get_body(Store, FileBody) of
-                        {ok, BinBody} ->
-                            case nkfile_util:encrypt(Store, File, BinBody) of
-                                {ok, File2, BinBody2} ->
-                                    SrvId:nkfile_upload(SrvId, Store, File2, BinBody2);
-                                {error, Error} ->
-                                    {error, Error}
-                            end;
-                        {error, Error} ->
-                            {error, Error}
-                    end;
+upload(SrvId, #{store_id:=StoreId}=File, FileBody) ->
+    case get_store(SrvId, StoreId) of
+        {ok, Store} ->
+            upload(SrvId, Store, File, FileBody);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+%% @doc Sends a file to the backend
+-spec upload(nkservice:id(), store(), file(), file_body()) ->
+    {ok, file()} | {error, term()}.
+
+upload(SrvId, Store, File, FileBody) ->
+    case nkfile_util:get_body(Store, FileBody) of
+        {ok, BinBody} ->
+            case nkfile_util:encrypt(Store, File, BinBody) of
+                {ok, File2, BinBody2} ->
+                    SrvId:nkfile_upload(SrvId, Store, File2, BinBody2);
                 {error, Error} ->
                     {error, Error}
             end;
-        not_found ->
-            {error, service_not_found}
+        {error, Error} ->
+            {error, Error}
     end.
 
 
@@ -96,23 +99,32 @@ upload(Srv, #{store_id:=StoreId}=File, FileBody) ->
 -spec download(nkservice:id(), file()) ->
     {ok, file(), binary()} | {error, term()}.
 
-download(Srv, #{store_id:=StoreId}=File) ->
-    case nkservice_srv:get_srv_id(Srv) of
-        {ok, SrvId} ->
-            case get_store(SrvId, StoreId) of
-                {ok, Store} ->
-                    case SrvId:nkfile_download(SrvId, Store, File) of
-                        {ok, File, Enc} ->
-                            nkfile_util:decrypt(Store, File, Enc);
-                        {error, Error} ->
-                            {error, Error}
-                    end;
+download(SrvId, #{store_id:=StoreId}=File) ->
+    case get_store(SrvId, StoreId) of
+        {ok, Store} ->
+            case SrvId:nkfile_download(SrvId, Store, File) of
+                {ok, File, Enc} ->
+                    nkfile_util:decrypt(Store, File, Enc);
                 {error, Error} ->
                     {error, Error}
             end;
-        not_found ->
-            {error, service_not_found}
+        {error, Error} ->
+            {error, Error}
     end.
+
+
+%% @doc
+-spec download(nkservice:id(), store(), file()) ->
+    {ok, file(), binary()} | {error, term()}.
+
+download(SrvId, Store, File) ->
+    case SrvId:nkfile_download(SrvId, Store, File) of
+        {ok, File, Enc} ->
+            nkfile_util:decrypt(Store, File, Enc);
+        {error, Error} ->
+            {error, Error}
+    end.
+
 
 
 %% @doc
