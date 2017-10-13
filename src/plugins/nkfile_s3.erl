@@ -107,7 +107,7 @@ get_config(#{config:=Config}) ->
             {to_list(Bucket), AwsConfig};
         true ->
             Host = maps:get(host, Config),
-            AwsConfig2 = maps:put(s3_host, to_list(Host), AwsConfig),
+            AwsConfig2 = AwsConfig#aws_config{s3_host=to_list(Host)},
             {to_list(Bucket), AwsConfig2}
     end.
 
