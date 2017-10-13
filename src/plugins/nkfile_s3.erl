@@ -88,11 +88,10 @@ store_syntax() ->
             bucket => binary,
             aws_id => binary,
             aws_secret => binary,
+            host => binary,
             '__mandatory' => [bucket, aws_id, aws_secret]
         }
     }.
-
-
 
 %% @private
 get_config(#{config:=Config}) ->
@@ -103,8 +102,14 @@ get_config(#{config:=Config}) ->
         s3_follow_redirect = true
         %% s3_host=Host,     "nkobjects.s3.eu-central-1.amazonaws.com"
     },
-    {to_list(Bucket), AwsConfig}.
-
+    case maps:is_key(host, Config) of
+        false -> 
+            {to_list(Bucket), AwsConfig};
+        true ->
+            Host = maps:get(host, Config),
+            AwsConfig2 = maps:put(s3_host, to_list(Host), AwsConfig),
+            {to_list(Bucket), AwsConfig2}
+    end.
 
 %% @private
 to_list(Term) -> nklib_util:to_list(Term).
