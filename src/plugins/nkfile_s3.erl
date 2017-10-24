@@ -123,7 +123,7 @@ get_config(#{config:=Config}) ->
             BucketAfterHost = maps:get(bucket_after_host, Config),
             AwsConfig2 = AwsConfig#aws_config{s3_host=to_list(Host), 
                                               s3_scheme=to_list(Scheme), 
-                                              s3_bucket_access_method=BucketAccess,
+                                              s3_bucket_access_method=BucketAccessMethod,
                                               s3_bucket_after_host=BucketAfterHost,
                                               s3_port=Port},
             {to_list(Bucket), AwsConfig2}
