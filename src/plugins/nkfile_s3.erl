@@ -90,6 +90,7 @@ store_syntax() ->
             aws_secret => binary,
             host => binary,
             port => integer,
+            scheme => binary,
             '__mandatory' => [bucket, aws_id, aws_secret]
         }
     }.
@@ -109,7 +110,8 @@ get_config(#{config:=Config}) ->
         true ->
             Host = maps:get(host, Config),
             Port = maps:get(port, Config, 80),
-            AwsConfig2 = AwsConfig#aws_config{s3_host=to_list(Host), s3_port=Port},
+            Scheme = maps:get(scheme, Config, <<"https">>),
+            AwsConfig2 = AwsConfig#aws_config{s3_host=to_list(Host), s3_scheme=to_list(Scheme), s3_port=Port},
             {to_list(Bucket), AwsConfig2}
     end.
 
