@@ -24,6 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([error/1]).
+-export([service_init/2]).
 -export([nkfile_get_store/2, nkfile_parse_store/2]).
 -export([nkfile_upload/4, nkfile_download/3]).
 
