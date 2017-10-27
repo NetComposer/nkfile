@@ -20,12 +20,11 @@
 
 %% @doc NkFILE callbacks
 
--module(nkfile_s3_callbacks).
+-module(nkfile_filesystem_plugin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([nkfile_parse_store/2, nkfile_upload/4, nkfile_download/3]).
+-export([plugin_deps/0]).
 
--include("nkfile.hrl").
 
 
 %% ===================================================================
@@ -36,31 +35,14 @@
 
 
 
-
-
 %% ===================================================================
-%% Mail callbacks
+%% Plugin callbacks
+%%
+%% These are used when NkFILE is started as a NkSERVICE plugin
 %% ===================================================================
 
-%% @private
-nkfile_parse_store(Data, ParseOpts) ->
-    nkfile_s3:parse_store(Data, ParseOpts).
 
-
-%% @private
-nkfile_upload(SrvId, #{class:=s3}=Store, File, Body) ->
-    nkfile_s3:upload(SrvId, Store, File, Body);
-
-nkfile_upload(_SrvId, _Store, _File, _Body) ->
-    continue.
-
-
-%% @private
-nkfile_download(SrvId, #{class:=s3}=Store, File) ->
-    nkfile_s3:download(SrvId, Store, File);
-
-nkfile_download(_SrvId, _Store, _File) ->
-    continue.
-
+plugin_deps() ->
+    [nkfile].
 
 

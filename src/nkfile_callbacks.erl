@@ -23,7 +23,6 @@
 -module(nkfile_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0, plugin_syntax/0, service_init/2]).
 -export([error/1]).
 -export([nkfile_get_store/2, nkfile_parse_store/2]).
 -export([nkfile_upload/4, nkfile_download/3]).
@@ -40,22 +39,6 @@
 
 % -type continue() :: continue | {continue, list()}.
 
-
-
-%% ===================================================================
-%% Plugin callbacks
-%%
-%% These are used when NkFILE is started as a NkSERVICE plugin
-%% ===================================================================
-
-
-plugin_deps() ->
-    [].
-
-
-plugin_syntax() ->
-	#{
-	}.
 
 
 service_init(_Service, #{id:=SrvId}=State) ->

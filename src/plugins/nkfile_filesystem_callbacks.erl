@@ -23,7 +23,6 @@
 -module(nkfile_filesystem_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0]).
 -export([nkfile_parse_store/2, nkfile_upload/4, nkfile_download/3]).
 
 -include("nkfile.hrl").
@@ -36,16 +35,6 @@
 % -type continue() :: continue | {continue, list()}.
 
 
-
-%% ===================================================================
-%% Plugin callbacks
-%%
-%% These are used when NkFILE is started as a NkSERVICE plugin
-%% ===================================================================
-
-
-plugin_deps() ->
-    [nkfile].
 
 
 
