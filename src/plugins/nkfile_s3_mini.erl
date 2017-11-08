@@ -128,7 +128,7 @@ endpoint(Scheme, Host, Port) ->
                  "://",
                  to_list(Host),
                  ":",
-                 to_list(Port)]),
+                 to_list(Port)], ""),
 
 
 %% @private
