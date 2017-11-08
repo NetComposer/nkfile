@@ -119,8 +119,17 @@ get_config(#{config:=Config}) ->
        port := Port, 
        scheme := Scheme,
        bucket_access := BucketAccess } = Config,
-    Endpoint = atom_to_list(Scheme) ++ "://" ++ Host  ++ ":" ++ integer_to_list(Port),
+    Endpoint = endpoint(Scheme, Host, Port),
     { to_list(Bucket), mini_s3:new(AccessKey, SecretKey, Endpoint, BucketAccess) }.
+
+endpoint(Scheme, Host, Port) ->
+    string:join([
+                 to_list(Scheme),
+                 "://",
+                 to_list(Host),
+                 ":",
+                 to_list(Port)]),
+
 
 %% @private
 to_list(Term) -> nklib_util:to_list(Term).
