@@ -55,7 +55,7 @@ plugin_deps() ->
 
 %% @private
 nkfile_parse_store(Data, ParseOpts) ->
-    nkfile_s3:parse_store(Data, ParseOpts).
+    nkfile_s3_mini:parse_store(Data, ParseOpts).
 
 
 %% @private
