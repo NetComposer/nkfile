@@ -43,6 +43,7 @@ upload(_SrvId, Store, #{name:=Name}=File, Body) ->
     {Bucket, AwsConfig} = get_config(Store),
     try
         Res = erlcloud_s3:put_object(Bucket, to_list(Name), Body, [], AwsConfig),
+        lager:debug("S3 upload: ~p/~p => ~p", [Bucket, to_list(Name), Res]),
         Meta = maps:get(meta, File, #{}),
         {ok, File#{meta=>Meta#{aws_res=>Res}}}
     catch

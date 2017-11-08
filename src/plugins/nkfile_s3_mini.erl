@@ -43,6 +43,7 @@ upload(_SrvId, Store, #{name:=Name}=File, Body) ->
     try
         case mini_s3:put_object(Bucket, to_list(Name), Body, [], [], AwsConfig) of
             [{version_id, _}]=Res -> 
+                lager:debug("S3 mini upload: ~p/~p => ~p", [Bucket, to_list(Name), Res]),
                 Meta = maps:get(meta, File, #{}),
                 {ok, File#{meta=>Meta#{aws_res=>maps:from_list(Res)}}};
             Other-> 
