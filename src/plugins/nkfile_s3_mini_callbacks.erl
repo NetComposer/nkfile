@@ -60,7 +60,7 @@ nkfile_parse_store(Data, ParseOpts) ->
 
 %% @private
 nkfile_upload(SrvId, #{class:=s3_mini}=Store, File, Body) ->
-    nkfile_s3:upload(SrvId, Store, File, Body);
+    nkfile_s3_mini:upload(SrvId, Store, File, Body);
 
 nkfile_upload(_SrvId, _Store, _File, _Body) ->
     continue.
@@ -68,7 +68,7 @@ nkfile_upload(_SrvId, _Store, _File, _Body) ->
 
 %% @private
 nkfile_download(SrvId, #{class:=s3_mini}=Store, File) ->
-    nkfile_s3:download(SrvId, Store, File);
+    nkfile_s3_mini:download(SrvId, Store, File);
 
 nkfile_download(_SrvId, _Store, _File) ->
     continue.
