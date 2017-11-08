@@ -123,12 +123,11 @@ get_config(#{config:=Config}) ->
     { to_list(Bucket), mini_s3:new(AccessKey, SecretKey, Endpoint, BucketAccess) }.
 
 endpoint(Scheme, Host, Port) ->
-    string:join([
-                 to_list(Scheme),
+    string:join([to_list(Scheme),
                  "://",
                  to_list(Host),
                  ":",
-                 to_list(Port)], ""),
+                 to_list(Port)], "").
 
 
 %% @private
