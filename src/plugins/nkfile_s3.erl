@@ -100,7 +100,7 @@ store_syntax() ->
                               host, 
                               port,
                               scheme,
-                              bucket_access_method, 
+                              bucket_access, 
                               bucket_after_host]
             },
             '__defaults' => #{
