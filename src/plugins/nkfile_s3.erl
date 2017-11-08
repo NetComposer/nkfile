@@ -91,7 +91,7 @@ store_syntax() ->
             aws_secret => binary,
             host => binary,
             port => integer,
-            bucket_access_method => atom,
+            bucket_access => atom,
             bucket_after_host => atom,
             scheme => binary,
             '__mandatory' => [bucket, 
@@ -102,7 +102,10 @@ store_syntax() ->
                               scheme,
                               bucket_access_method, 
                               bucket_after_host]
-            }
+            },
+            '__defaults' => #{
+              bucket_after_host => false
+             }
         }.
 
 %% @private
@@ -113,7 +116,7 @@ get_config(#{config:=Config}) ->
        host := Host,
        port := Port,
        scheme := Scheme, 
-       bucket_access_method := BucketAccess,
+       bucket_access := BucketAccess,
        bucket_after_host := BucketAfterHost } = Config,
 
     AwsConfig = #aws_config{
