@@ -100,12 +100,10 @@ store_syntax() ->
                               host, 
                               port,
                               scheme,
-                              bucket_access]
+                              bucket_access,
+                              bucket_after_host]
 
-            },
-            '__defaults' => #{
-              bucket_after_host => false
-             }
+            }
         }.
 
 %% @private
