@@ -20,12 +20,11 @@
 
 %% @doc NkFILE callbacks
 
--module(nkfile_s3).
+-module(nkfile_s3_mini).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 -export([upload/4, download/3, parse_store/2, store_syntax/0]).
 
 -include("nkfile.hrl").
--include_lib("erlcloud/include/erlcloud_aws.hrl").
 
 %% ===================================================================
 %% Types
@@ -42,10 +41,14 @@
 upload(_SrvId, Store, #{name:=Name}=File, Body) ->
     {Bucket, AwsConfig} = get_config(Store),
     try
-        Res = erlcloud_s3:put_object(Bucket, to_list(Name), Body, [], AwsConfig),
-        lager:debug("S3 upload: ~p/~p => ~p", [Bucket, to_list(Name), Res]),
-        Meta = maps:get(meta, File, #{}),
-        {ok, File#{meta=>Meta#{aws_res=>Res}}}
+        case mini_s3:put_object(Bucket, to_list(Name), Body, [], [], AwsConfig) of
+            [{version_id, _}]=Res -> 
+                lager:debug("S3 mini upload: ~p/~p => ~p", [Bucket, to_list(Name), Res]),
+                Meta = maps:get(meta, File, #{}),
+                {ok, File#{meta=>Meta#{aws_res=>maps:from_list(Res)}}};
+            Other-> 
+                {error, {s3_error, nklib_util:to_binary(Other)}}
+        end
     catch
         error:Error ->
             {error, {s3_error, nklib_util:to_binary(Error)}}
@@ -56,9 +59,17 @@ upload(_SrvId, Store, #{name:=Name}=File, Body) ->
 download(_SrvId, Store, #{name:=Name}=File) ->
     {Bucket, AwsConfig} = get_config(Store),
     try
-        Res = erlcloud_s3:get_object(Bucket, to_list(Name), [], AwsConfig),
-        Body = nklib_util:get_value(content, Res),
-        {ok, File, Body}
+        case mini_s3:get_object(Bucket, to_list(Name), [], AwsConfig) of
+            [_|_]=Meta ->
+                case proplists:get_value(content, Meta) of
+                    undefined ->
+                        {error, {s3_error, no_content}};
+                    Body ->
+                        {ok, File, Body}
+                end;
+            Other ->
+                {error, {s3_error, nklib_util:to_binary(Other)}}
+        end
     catch
         error:Error ->
             {error, {s3_error, nklib_util:to_binary(Error)}}
@@ -69,7 +80,7 @@ download(_SrvId, Store, #{name:=Name}=File) ->
 %% @doc
 parse_store(Data, ParseOpts) ->
     case nklib_syntax:parse(Data, #{class=>atom}) of
-        {ok, #{class:=s3}, _} ->
+        {ok, #{class:=s3_mini}, _} ->
             case nklib_syntax:parse(Data, store_syntax(), ParseOpts) of
                 {ok, Store, UnknownFields} ->
                     {ok, Store, UnknownFields};
@@ -86,49 +97,39 @@ store_syntax() ->
     Base = nkfile_util:store_syntax(),
     Base#{
         config := #{
-            bucket => binary,
             aws_id => binary,
             aws_secret => binary,
+            bucket => binary,
             host => binary,
             port => integer,
+            scheme => atom,
             bucket_access => atom,
-            bucket_after_host => atom,
-            scheme => binary,
-            '__mandatory' => [bucket, 
-                              aws_id, 
-                              aws_secret, 
-                              host, 
-                              port,
-                              scheme,
-                              bucket_access,
-                              bucket_after_host]
-
+            '__mandatory' => [host, port, scheme, bucket, aws_id, aws_secret],
+            '__defaults' => #{
+                bucket_access => virtual_hosted
             }
-        }.
+        }
+    }.
 
 %% @private
 get_config(#{config:=Config}) ->
-    #{ bucket:=Bucket, 
-       aws_id:=AwsId, 
-       aws_secret:=AwsSecret, 
+    #{ bucket := Bucket, 
+       aws_id := AccessKey , 
+       aws_secret := SecretKey,
        host := Host,
-       port := Port,
-       scheme := Scheme, 
-       bucket_access := BucketAccess,
-       bucket_after_host := BucketAfterHost } = Config,
+       port := Port, 
+       scheme := Scheme,
+       bucket_access := BucketAccess } = Config,
+    Endpoint = endpoint(Scheme, Host, Port),
+    { to_list(Bucket), mini_s3:new(AccessKey, SecretKey, Endpoint, BucketAccess) }.
 
-    AwsConfig = #aws_config{
-        access_key_id = to_list(AwsId),
-        secret_access_key = to_list(AwsSecret),
-        s3_follow_redirect = true,
-        s3_bucket_access_method = BucketAccess,
-        s3_bucket_after_host = BucketAfterHost,
-        s3_scheme =to_list(Scheme),
-        s3_host = to_list(Host),
-        s3_port = Port
-    },
+endpoint(Scheme, Host, Port) ->
+    string:join([to_list(Scheme),
+                 "://",
+                 to_list(Host),
+                 ":",
+                 to_list(Port)], "").
 
-    {to_list(Bucket), AwsConfig}.
 
 %% @private
 to_list(Term) -> nklib_util:to_list(Term).
