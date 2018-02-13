@@ -103,10 +103,10 @@ store_syntax() ->
             host => binary,
             port => integer,
             scheme => atom,
-            bucket_access => atom,
+            bucket_access => {atom, [auto, virtual_hosted, path]},
             '__mandatory' => [host, port, scheme, bucket, aws_id, aws_secret],
             '__defaults' => #{
-                bucket_access => virtual_hosted
+                bucket_access => auto
             }
         }
     }.
@@ -119,9 +119,18 @@ get_config(#{config:=Config}) ->
        host := Host,
        port := Port, 
        scheme := Scheme,
-       bucket_access := BucketAccess } = Config,
+       bucket_access := BucketAccess
+    } = Config,
+    BucketAccess2 = case BucketAccess of
+        auto ->
+            path;
+        virtual_hosted ->
+            virtual_domain;
+        path ->
+            path
+    end,
     Endpoint = endpoint(Scheme, Host, Port),
-    { to_list(Bucket), mini_s3:new(AccessKey, SecretKey, Endpoint, BucketAccess) }.
+    { to_list(Bucket), mini_s3:new(AccessKey, SecretKey, Endpoint, BucketAccess2) }.
 
 endpoint(Scheme, Host, Port) ->
     string:join([to_list(Scheme),
