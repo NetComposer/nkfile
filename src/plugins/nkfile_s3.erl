@@ -91,20 +91,14 @@ store_syntax() ->
             aws_secret => binary,
             host => binary,
             port => integer,
-            bucket_access => atom,
-            bucket_after_host => atom,
             scheme => binary,
-            '__mandatory' => [bucket, 
-                              aws_id, 
-                              aws_secret, 
-                              host, 
-                              port,
-                              scheme,
-                              bucket_access,
-                              bucket_after_host]
-
+            bucket_access => {atom, [auto, virtual_hosted, path]},
+            '__mandatory' => [bucket, aws_id, aws_secret, host, port, scheme],
+            '__defaults' => #{
+                bucket_access => auto
             }
-        }.
+        }
+    }.
 
 %% @private
 get_config(#{config:=Config}) ->
@@ -114,14 +108,21 @@ get_config(#{config:=Config}) ->
        host := Host,
        port := Port,
        scheme := Scheme, 
-       bucket_access := BucketAccess,
-       bucket_after_host := BucketAfterHost } = Config,
+       bucket_access := BucketAccess} = Config,
 
+    {BucketAccess2, BucketAfterHost} = case BucketAccess of
+        auto ->
+            {auto, false};
+        virtual_hosted ->
+            {vhost, false};
+        path ->
+            {path, true}
+    end,
     AwsConfig = #aws_config{
         access_key_id = to_list(AwsId),
         secret_access_key = to_list(AwsSecret),
         s3_follow_redirect = true,
-        s3_bucket_access_method = BucketAccess,
+        s3_bucket_access_method = BucketAccess2,
         s3_bucket_after_host = BucketAfterHost,
         s3_scheme =to_list(Scheme),
         s3_host = to_list(Host),
