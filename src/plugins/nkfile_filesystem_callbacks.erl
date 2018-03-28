@@ -23,7 +23,7 @@
 -module(nkfile_filesystem_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([nkfile_parse_store/2, nkfile_upload/4, nkfile_download/3]).
+-export([nkfile_upload/5, nkfile_download/4]).
 
 -include("nkfile.hrl").
 
@@ -39,29 +39,48 @@
 
 
 %% ===================================================================
-%% Mail callbacks
+%% Callbacks
 %% ===================================================================
 
-%% @private
-nkfile_parse_store(Data, ParseOpts) ->
-    nkfile_filesystem:parse_store(Data, ParseOpts).
-
 
 %% @private
-nkfile_upload(SrvId, #{class:=filesystem}=Store, File, Body) ->
-    nkfile_filesystem:upload(SrvId, Store, File, Body);
+nkfile_upload(SrvId, PackageId, filesystem, Bin, Meta) ->
+    case Meta of
+        #{name:=Name} ->
+            Path = nkservice_util:get_cache(SrvId, {nkfile_filesystem, PackageId, file_path}),
+            Path2 = filename:join(Path, Name),
+            case file:write_file(Path2, Bin) of
+                ok ->
+                    {ok, Meta#{file_path=>Path2}};
+                {error, Error} ->
+                    lager:warning("NkFILE write error at ~s: ~p", [Path2, Error]),
+                    {error, file_write_error}
+            end;
+        _ ->
+            {error, missing_file_name1}
+    end;
 
-nkfile_upload(_SrvId, _Store, _File, _Body) ->
+nkfile_upload(_SrvId, _PackageId, _StorageClass, _Bin, _Meta) ->
     continue.
 
 
 
 %% @private
-nkfile_download(SrvId, #{class:=filesystem}=Store, File) ->
-    nkfile_filesystem:download(SrvId, Store, File);
+nkfile_download(SrvId, PackageId, filesystem, Meta) ->
+    case Meta of
+        #{name:=Name} ->
+            Path = nkservice_util:get_cache(SrvId, {nkfile_filesystem, PackageId, file_path}),
+            Path2 = filename:join(Path, Name),
+            case file:read_file(Path2) of
+                {ok, Body} ->
+                    {ok, Body, Meta#{file_path=>Path2}};
+                {error, Error} ->
+                    lager:warning("NkFILE read error at ~s: ~p", [Path2, Error]),
+                    {error, file_read_error}
+            end;
+        _ ->
+            {error, missing_file_name2}
+    end;
 
-nkfile_download(_SrvId, _Store, _File) ->
+nkfile_download(_SrvId, _PackageId, _StorageClass, _Meta) ->
     continue.
-
-
-

@@ -23,8 +23,9 @@
 -module(nkfile_filesystem_plugin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0]).
+-export([plugin_deps/0, plugin_config/3]).
 
+-include("nkfile.hrl").
 
 
 %% ===================================================================
@@ -38,11 +39,39 @@
 %% ===================================================================
 %% Plugin callbacks
 %%
-%% These are used when NkFILE is started as a NkSERVICE plugin
 %% ===================================================================
 
 
 plugin_deps() ->
     [nkfile].
 
+
+
+%% @doc
+plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
+	Syntax = #{
+        storageClass => binary,
+        filePath => binary
+    },
+    case nklib_syntax:parse(Config, Syntax, #{allow_unknown=>true}) of
+        {ok, #{storageClass := <<"filesystem">>}=Parsed, _} ->
+            case Parsed of
+                #{filePath:=Path} ->
+                    CacheMap1 = maps:get(cache_map, Spec, #{}),
+                    CacheMap2 = CacheMap1#{
+                        {nkfile, Id, storage_class} => filesystem,
+                        {nkfile_filesystem, Id, file_path} => Path
+                    },
+                    {ok, Spec#{config:=Parsed, cache_map=>CacheMap2}};
+                _ ->
+                    {error, {missing_field, <<Id/binary, ".config.filePath">>}}
+            end;
+        {ok, _, _} ->
+            continue;
+        {error, Error} ->
+            {error, Error}
+    end;
+
+plugin_config(_Class, _Package, _Service) ->
+    continue.
 

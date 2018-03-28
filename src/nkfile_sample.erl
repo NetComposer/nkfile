@@ -21,30 +21,133 @@
 %% @doc NkFILE
 -module(nkfile_sample).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
+
+-define(SRV, file_test).
+
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include("nkfile.hrl").
 
 
-up() ->
-    File1 = #{store_id=>local, name=>n1},
-    {ok, _} = nkfile:upload(root, File1, <<"123">>),
-    {ok, _, <<"123">>} = nkfile:download(root, File1),
+%% @doc Starts the service
+start() ->
+    Spec = #{
+        plugins => [nkfile_filesystem, nkfile_s3],
+        packages => [
+            #{
+                id => file1,
+                class => 'File',
+                config => #{
+                    storageClass => filesystem,
+                    filePath => "/tmp",
+                    debug => true
+                }
+            },
+            #{
+                id => file2,
+                class => 'File',
+                config => #{
+                    storageClass => filesystem,
+                    filePath => "/tmp",
+                    encryption => aes_cfb128
+                }
+            },
+            #{
+                id => s3,
+                class => 'File',
+                config => #{
+                    storageClass => s3,
+                    targets => [
+%%                        #{
+%%                            url => "http://localhost:9000",
+%%                            weight => 1,
+%%                            pool => 2
+%%                        },
+%%                        #{
+%%                            url => "http://127.0.0.2:9000",
+%%                            weight => 2,
+%%                            pool => 2
+%%                        },
+                        #{
+                            url => "https://s3-eu-west-1.amazonaws.com",
+                            pool => 2
+                        }
 
-    File2 = #{store_id=>local_secure, name=>n2},
-    {ok, #{password:=_}=File3} = nkfile:upload(root, File2, <<"321">>),
-    {error, missing_password} = nkfile:download(root, File2),
-    {ok, _, <<"321">>} = nkfile:download(root, File3).
+                    ],
+%%                    s3_id => "5UBED0Q9FB7MFZ5EWIOJ",
+%%                    s3_secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+%%                    s3_bucket => bucket1,
+
+                    s3_id => "AKIAJZ7VECSGCJVB6JIQ",
+                    s3_secret => "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",
+                    s3_bucket => <<"carlos-publico">>,
 
 
-up_s3() ->
-    File1 = #{store_id=>'carlos.s3', name=>n1},
-    {ok, _} = nkfile:upload(root, File1, <<"123">>),
-    {ok, _, <<"123">>} = nkfile:download(root, File1),
 
-    File2 = #{store_id=>'carlos.s3_secure', name=>n2},
-    {ok, #{password:=_}=File3} = nkfile:upload(root, File2, <<"321">>),
-    {error, missing_password} = nkfile:download(root, File2),
-    {ok, _, <<"321">>} = nkfile:download(root, File3).
+                    encryption => aes_cfb128,
+                    debug => true
+                }
+            }
+        ],
+        modules => [
+            #{
+                id => s1,
+                class => luerl,
+                code => s1(),
+                debug => true
+            }
+        ]
+    },
+    nkservice:start(?SRV, Spec).
+
+
+%% @doc Stops the service
+stop() ->
+    nkservice:stop(?SRV).
+
+
+%%getRequest() ->
+%%    nkservice_luerl_instance:call({?SRV, s1, main}, [getRequest], []).
+
+
+s1() -> <<"
+    fileConfig = {
+        storageClass = 'filesystem',
+        filePath = '/tmp'
+    }
+
+    file2 = startPackage('File', fileConfig)
+
+    function getRequest()
+        return es.request('get', '/')
+    end
+
+">>.
+
+
+opts() ->
+    nkservice_util:get_cache(?SRV, {nkelastic, <<"es1">>, opts}).
+
+
+
+
+test() ->
+    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file1, <<"123">>, #{name=>n1}),
+    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file1, #{name=>n1}),
+
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file2, <<"321">>, #{name=>n2}),
+    {error, missing_password} = nkfile:download(?SRV, file2, #{name=>n2}),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file2, #{name=>n2, password=>Pass}),
+
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, s3, <<"321">>, #{name=>n3}),
+    {error, missing_password} = nkfile:download(?SRV, s3, #{name=>n2}),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, s3, #{name=>n3, password=>Pass}).
+
+
+test2() ->
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, s3, <<"321">>, #{name=>n3}),
+    {error, missing_password} = nkfile:download(?SRV, s3, #{name=>n3}),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, s3, #{name=>n3, password=>Pass}).
 
 

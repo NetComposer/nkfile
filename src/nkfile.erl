@@ -23,70 +23,47 @@
 -module(nkfile).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([upload/3, upload/4, download/2, download/3]).
--export([get_store/2, parse_store/2, parse_store/3, parse_file/2, parse_file/3]).
--export_type([store_id/0, store_class/0]).
--include("nkfile.hrl").
+-export([upload/4, download/3]).
 
+-include("nkfile.hrl").
+-include_lib("nkservice/include/nkservice.hrl").
+
+-define(IV, <<"NetComposerFile.">>).
 
 
 %% ===================================================================
 %% Types
 %% ===================================================================
 
--type store_id() :: term().
--type store_class() :: atom().
-
--type file() ::
-    #{
-        name => binary(),
-        store_id => store_id(),
-        password => binary(),
-        debug => boolean(),
-        meta => map()
-    }.
-
-
--type store() ::
-    #{
-        class => store_class(),
-        max_size => integer(),
-        encryption => undefined | aes_cfb128,
-        config => map()
-    }.
-
-
 
 -type file_body() :: {base64, binary()} | binary() | term().
 
+%% Options dependant of storage class
+%% ----------------------------------
+%%
+%% - id
+%% - name: mandatory for filesystem
+%% - password
+%% - contentType
+
+-type meta() :: map().
 
 %% ===================================================================
 %% Public
 %% ===================================================================
 
 %% @doc Sends a file to the backend
--spec upload(nkservice:id(), file(), file_body()) ->
-    {ok, file()} | {error, term()}.
+-spec upload(nkservice:id(), nkservice:package_id(), file_body(), meta()) ->
+    {ok, meta()} | {error, term()}.
 
-upload(SrvId, #{store_id:=StoreId}=File, FileBody) ->
-    case get_store(SrvId, StoreId) of
-        {ok, Store} ->
-            upload(SrvId, Store, File, FileBody);
-        {error, Error} ->
-            {error, Error}
-    end.
-
-
-%% @doc Sends a file to the backend
--spec upload(nkservice:id(), store(), file(), file_body()) ->
-    {ok, file()} | {error, term()}.
-
-upload(SrvId, Store, File, FileBody) ->
-    case nkfile_util:get_body(Store, FileBody) of
-        {ok, BinBody} ->
-            case nkfile_util:encrypt(Store, File, BinBody) of
-                {ok, File2, BinBody2} ->
-                    SrvId:nkfile_upload(SrvId, Store, File2, BinBody2);
+upload(SrvId, PackageId, FileBody, Meta) ->
+    PackageId2 = nklib_util:to_binary(PackageId),
+    case get_body(SrvId, PackageId2, FileBody) of
+        {ok, BinBody1} ->
+            case encrypt(SrvId, PackageId2, BinBody1, Meta) of
+                {ok, BinBody2, Meta2} ->
+                    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
+                    ?CALL_SRV(SrvId, nkfile_upload, [SrvId, PackageId2, Class, BinBody2, Meta2]);
                 {error, Error} ->
                     {error, Error}
             end;
@@ -96,74 +73,86 @@ upload(SrvId, Store, File, FileBody) ->
 
 
 %% @doc
--spec download(nkservice:id(), file()) ->
-    {ok, file(), binary()} | {error, term()}.
+-spec download(nkservice:id(), nkpackage:id(), meta()) ->
+    {ok, binary(), meta()} | {error, term()}.
 
-download(SrvId, #{store_id:=StoreId}=File) ->
-    case get_store(SrvId, StoreId) of
-        {ok, Store} ->
-            case SrvId:nkfile_download(SrvId, Store, File) of
-                {ok, File, Enc} ->
-                    nkfile_util:decrypt(Store, File, Enc);
-                {error, Error} ->
-                    {error, Error}
+download(SrvId, PackageId, Meta) ->
+    PackageId2 = nklib_util:to_binary(PackageId),
+    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
+    case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId2, Class, Meta]) of
+        {ok, Bin1, Meta2} ->
+            decrypt(SrvId, PackageId2, Bin1, Meta2);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+
+
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+%% @private
+get_body(SrvId, PackageId, {base64, Base64}) ->
+    case catch base64:decode(Base64) of
+        {'EXIT', _} ->
+            {error, base64_decode_error};
+        Bin ->
+            get_body(SrvId, PackageId, Bin)
+    end;
+
+get_body(SrvId, PackageId, Bin) when is_binary(Bin) ->
+    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, max_size}) of
+        0 ->
+            {ok, Bin};
+        Size when byte_size(Bin) > Size ->
+            {error, file_too_large};
+        _ ->
+            {ok, Bin}
+    end;
+
+get_body(_SrvId, _PackageId, _FileBody) ->
+    {error, invalid_file_body}.
+
+
+%% @private
+encrypt(SrvId, PackageId, Bin, Meta) ->
+    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, encryption}) of
+        none ->
+            {ok, Bin, Meta};
+        aes_cfb128 ->
+            Pass = maps:get(password, Meta, crypto:strong_rand_bytes(16)),
+            case catch crypto:block_encrypt(aes_cfb128, Pass, ?IV, Bin) of
+                {'EXIT', _} ->
+                    {error, encryption_error};
+                Bin2 ->
+                    {ok, Bin2, Meta#{password=>base64:encode(Pass)}}
             end;
-        {error, Error} ->
-            {error, Error}
+        Other ->
+            {error, {unknown_encryption_algo, Other}}
     end.
 
 
 %% @doc
--spec download(nkservice:id(), store(), file()) ->
-    {ok, file(), binary()} | {error, term()}.
-
-download(SrvId, Store, File) ->
-    case SrvId:nkfile_download(SrvId, Store, File) of
-        {ok, File, Enc} ->
-            nkfile_util:decrypt(Store, File, Enc);
-        {error, Error} ->
-            {error, Error}
+decrypt(SrvId, PackageId, Bin, Meta) ->
+    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, encryption}) of
+        none ->
+            {ok, Bin, Meta};
+        aes_cfb128 ->
+            case Meta of
+                #{password:=Pass} ->
+                    Pass2 = base64:decode(Pass),
+                    case catch crypto:block_decrypt(aes_cfb128, Pass2, ?IV, Bin) of
+                        {'EXIT', _} ->
+                            {error, decryption_error};
+                        Bin2 ->
+                            {ok, Bin2, Meta}
+                    end;
+                _ ->
+                    {error, missing_password}
+            end;
+        Other ->
+            {error, {unknown_encryption_algo, Other}}
     end.
-
-
-
-%% @doc
--spec get_store(nkservice:id(), store_id()) ->
-    {ok, store()} | {error, term()}.
-
-get_store(SrvId, StoreId) ->
-    SrvId:nkfile_get_store(SrvId, StoreId).
-
-
-%% @doc Parses a store
--spec parse_store(nkservice:id(), map()) ->
-    {ok, store(), [binary()]} | {error, term()}.
-
-parse_store(Srv, Map) ->
-    parse_store(Srv, Map, #{}).
-
-
-%% @doc
--spec parse_store(nkservice:id(), map(), nklib_syntax:parse_opts()) ->
-    {ok, store(), [binary()]} | {error, term()}.
-
-parse_store(SrvId, Map, ParseOpts) ->
-   SrvId:nkfile_parse_store(Map, ParseOpts).
-
-
-%% @doc
--spec parse_file(nkservice:id(), map()) ->
-    {ok, file(), [binary()]} | {error, term()}.
-
-parse_file(Srv, Map) ->
-    parse_store(Srv, Map, #{}).
-
-
-%% @doc
--spec parse_file(nkservice:id(), map(), nklib_syntax:parse_opts()) ->
-    {ok, file(), [binary()]} | {error, term()}.
-
-parse_file(_Srv, Map, ParseOpts) ->
-    Syntax = nkfile_util:file_syntax(),
-    nklib_syntax:parse(Map, Syntax, ParseOpts).
-

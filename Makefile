@@ -1,5 +1,5 @@
 APP = nkfile
-REBAR = rebar3
+REBAR = ./rebar3
 
 .PHONY: rel stagedevrel package version all tree shell
 

@@ -24,13 +24,11 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([error/1]).
--export([service_init/2]).
--export([nkfile_get_store/2, nkfile_parse_store/2]).
 -export([nkfile_upload/4, nkfile_download/3]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
--include_lib("nkapi/include/nkapi.hrl").
+% -include_lib("nkapi/include/nkapi.hrl").
 
 
 
@@ -42,23 +40,23 @@
 
 
 
-service_init(_Service, #{id:=SrvId}=State) ->
-    % Loads app stores
-    lists:foreach(
-        fun
-            (#{id:=Id}=Data) ->
-                case nkfile:parse_store(SrvId, Data) of
-                    {ok, Store, _} ->
-                        lager:info("NkFILE: loading store ~s", [Id]),
-                        nkfile_app:put_store(nklib_util:to_binary(Id), Store);
-                    {error, Error} ->
-                        lager:warning("NkFILE: could not load store ~p: ~p", [Data, Error])
-                end;
-            (Data) ->
-                lager:warning("NkFILE: invalid store: ~p", [Data])
-        end,
-        nkfile_app:get(stores, [])),
-    {ok, State}.
+%%service_init(_Service, #{id:=SrvId}=State) ->
+%%    % Loads app stores
+%%    lists:foreach(
+%%        fun
+%%            (#{id:=Id}=Data) ->
+%%                case nkfile:parse_store(SrvId, Data) of
+%%                    {ok, Store, _} ->
+%%                        lager:info("NkFILE: loading store ~s", [Id]),
+%%                        nkfile_app:put_store(nklib_util:to_binary(Id), Store);
+%%                    {error, Error} ->
+%%                        lager:warning("NkFILE: could not load store ~p: ~p", [Data, Error])
+%%                end;
+%%            (Data) ->
+%%                lager:warning("NkFILE: invalid store: ~p", [Data])
+%%        end,
+%%        nkfile_app:get(stores, [])),
+%%    {ok, State}.
 
 
 
@@ -85,40 +83,18 @@ error(_)                                -> continue.
 %% ===================================================================
 
 
-
-%% @doc Gets a store
--spec nkfile_get_store(nkservice:id(), nkfile:store_id()) ->
-    {ok, nkfile:store()} | {error, term()}.
-
-nkfile_get_store(_SrvId, Id) ->
-    case nkfile_app:get_store(Id) of
-        not_found ->
-            {error, {store_not_found, Id}};
-        Store ->
-            {ok, Store}
-    end.
-
-
-%% @doc Parses a store
--spec nkfile_parse_store(map(), nklib_syntax:parse_opts()) ->
-    {ok, nkfile:store(), [binary()]} | {error, term()}.
-
-nkfile_parse_store(_Store, _Opts) ->
-    {error, invalid_store}.
-
-
 %% @doc Stores the file
--spec nkfile_upload(nkservice:id(), nkfile:store(), nkfile:file(), binary()) ->
+-spec nkfile_upload(nkservice:id(), nkservice:package_id(), binary(), nkfile:meta()) ->
     {ok, nkfile:file()} | {error, term()}.
 
-nkfile_upload(_SrvId, _Store, _File, _Body) ->
+nkfile_upload(_SrvId, _PackageId, _Body, _Meta) ->
     {error, invalid_store}.
 
 
 %% @doc Retrieves the file
--spec nkfile_download(nkservice:id(), nkfile:store(), nkfile:file()) ->
+-spec nkfile_download(nkservice:id(), nkservice:package_id(), nkfile:meta()) ->
     {ok, nkfile:file(), binary()} | {error, term()}.
 
-nkfile_download(_SrvId, _Store, _File) ->
+nkfile_download(_SrvId, _PackageId, _Meta) ->
     {error, invalid_store}.
 

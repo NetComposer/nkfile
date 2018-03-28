@@ -4,6 +4,6 @@
     {modules, []},
     {registered, []},
     {mod, {nkfile_app, []}},
-    {applications, [nkservice, nkapi, mini_s3, erlcloud]},
+    {applications, [nkservice]},
     {env, []}
 ]}.
