@@ -45,8 +45,8 @@ plugin_deps() ->
 plugin_api(?PKG_FILE) ->
 	#{
 		luerl => #{
-			upload => {nkelastic, luerl_upload},
-            download => {nkelastic, luerl_download}
+			upload => {nkfile, luerl_upload},
+            download => {nkfile, luerl_download}
 		}
 	};
 

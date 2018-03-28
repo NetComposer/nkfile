@@ -51,18 +51,18 @@ plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
                     refresh => boolean,
                     '__mandatory' => [url]
                 }},
-                s3_id => binary,
-                s3_secret => binary,
-                s3_bucket => binary,
+                s3_Id => binary,
+                s3_Secret => binary,
+                bucket => binary,
                 resolveInterval => {integer, 0, none},
-                '__mandatory' => [targets, s3_id, s3_secret, s3_bucket]
+                '__mandatory' => [targets, s3_Id, s3_Secret, bucket]
             },
             case nklib_syntax:parse(Config, Syntax, #{allow_unknown=>true}) of
                 {ok, Parsed, _} ->
                     S3Config = #{
-                        key_id => maps:get(s3_id, Parsed),
-                        key => maps:get(s3_secret, Parsed),
-                        bucket => maps:get(s3_bucket, Parsed)
+                        key_id => maps:get(s3_Id, Parsed),
+                        key => maps:get(s3_Secret, Parsed),
+                        bucket => maps:get(bucket, Parsed)
                     },
                     CacheMap1 = maps:get(cache_map, Spec, #{}),
                     CacheMap2 = CacheMap1#{

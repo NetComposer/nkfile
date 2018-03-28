@@ -74,11 +74,10 @@ start() ->
 %%                            pool => 2,
 %%                            opts => #{tls_verify=>host, debug=>false}
 %%                        }
-
                     ],
-                    s3_id => "5UBED0Q9FB7MFZ5EWIOJ",
-                    s3_secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-                    s3_bucket => bucket1,
+                    s3_Id => "5UBED0Q9FB7MFZ5EWIOJ",
+                    s3_Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+                    bucket => bucket1,
                     encryption => aes_cfb128,
                     debug => true
                 }
@@ -101,8 +100,8 @@ stop() ->
     nkservice:stop(?SRV).
 
 
-%%getRequest() ->
-%%    nkservice_luerl_instance:call({?SRV, s1, main}, [getRequest], []).
+luerl_test_1() ->
+    nkservice_luerl_instance:call({?SRV, s1, main}, [test_1], []).
 
 
 s1() -> <<"
@@ -113,8 +112,14 @@ s1() -> <<"
 
     file2 = startPackage('File', fileConfig)
 
-    function getRequest()
-        return es.request('get', '/')
+    function test_1()
+        result, meta1 = file2.upload('123', {name='test1'})
+        if result == 'ok' then
+            body, meta2 = file2.download({name='test1'})
+            return body, meta2
+        else
+            return 'error'
+        end
     end
 
 ">>.

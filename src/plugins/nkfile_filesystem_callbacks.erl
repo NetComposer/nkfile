@@ -43,6 +43,7 @@
 %% ===================================================================
 
 
+
 %% @private
 nkfile_upload(SrvId, PackageId, filesystem, Bin, Meta) ->
     case Meta of
@@ -57,7 +58,7 @@ nkfile_upload(SrvId, PackageId, filesystem, Bin, Meta) ->
                     {error, file_write_error}
             end;
         _ ->
-            {error, missing_file_name1}
+            {error, missing_file_name}
     end;
 
 nkfile_upload(_SrvId, _PackageId, _StorageClass, _Bin, _Meta) ->

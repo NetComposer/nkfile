@@ -24,7 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([upload/4, download/3]).
-
+-export([luerl_upload/3, luerl_download/3]).
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
 
@@ -38,14 +38,9 @@
 
 -type file_body() :: {base64, binary()} | binary() | term().
 
-%% Options dependant of storage class
-%% ----------------------------------
-%%
-%% - id
-%% - name: mandatory for filesystem
-%% - password
-%% - contentType
 
+%% Options dependant of storage class
+%% @see nkfile_parse_meta
 -type meta() :: map().
 
 %% ===================================================================
@@ -58,12 +53,18 @@
 
 upload(SrvId, PackageId, FileBody, Meta) ->
     PackageId2 = nklib_util:to_binary(PackageId),
-    case get_body(SrvId, PackageId2, FileBody) of
-        {ok, BinBody1} ->
-            case encrypt(SrvId, PackageId2, BinBody1, Meta) of
-                {ok, BinBody2, Meta2} ->
-                    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
-                    ?CALL_SRV(SrvId, nkfile_upload, [SrvId, PackageId2, Class, BinBody2, Meta2]);
+    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
+    case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
+        {ok, Meta2} ->
+            case get_body(SrvId, PackageId2, FileBody) of
+                {ok, BinBody1} ->
+                    case encrypt(SrvId, PackageId2, BinBody1, Meta2) of
+                        {ok, BinBody2, Meta3} ->
+                            ?CALL_SRV(SrvId, nkfile_upload,
+                                      [SrvId, PackageId2, Class, BinBody2, Meta3]);
+                        {error, Error} ->
+                            {error, Error}
+                    end;
                 {error, Error} ->
                     {error, Error}
             end;
@@ -79,15 +80,42 @@ upload(SrvId, PackageId, FileBody, Meta) ->
 download(SrvId, PackageId, Meta) ->
     PackageId2 = nklib_util:to_binary(PackageId),
     Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
-    case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId2, Class, Meta]) of
-        {ok, Bin1, Meta2} ->
-            decrypt(SrvId, PackageId2, Bin1, Meta2);
+    case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
+        {ok, Meta2} ->
+            case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId2, Class, Meta2]) of
+                {ok, Bin1, Meta3} ->
+                    decrypt(SrvId, PackageId2, Bin1, Meta3);
+                {error, Error} ->
+                    {error, Error}
+            end;
         {error, Error} ->
             {error, Error}
     end.
 
 
+%% ===================================================================
+%% Luerl
+%% ===================================================================
 
+%% @private
+luerl_upload(SrvId, PackageId, [Body, Meta]) ->
+    lager:error("NKLOG MM ~p", [Meta]),
+    case upload(SrvId, PackageId, Body, Meta) of
+        {ok, Meta2} ->
+            [<<"ok">>, Meta2];
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+%% @private
+luerl_download(SrvId, PackageId, [Meta]) ->
+    case download(SrvId, PackageId, Meta) of
+        {ok, Body, Meta2} ->
+            [Body, Meta2];
+        {error, Error} ->
+            {error, Error}
+    end.
 
 
 %% ===================================================================

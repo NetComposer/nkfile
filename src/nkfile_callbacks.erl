@@ -24,11 +24,10 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([error/1]).
--export([nkfile_upload/4, nkfile_download/3]).
+-export([nkfile_parse_meta/4, nkfile_upload/4, nkfile_download/3]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
-% -include_lib("nkapi/include/nkapi.hrl").
 
 
 
@@ -37,26 +36,6 @@
 %% ===================================================================
 
 % -type continue() :: continue | {continue, list()}.
-
-
-
-%%service_init(_Service, #{id:=SrvId}=State) ->
-%%    % Loads app stores
-%%    lists:foreach(
-%%        fun
-%%            (#{id:=Id}=Data) ->
-%%                case nkfile:parse_store(SrvId, Data) of
-%%                    {ok, Store, _} ->
-%%                        lager:info("NkFILE: loading store ~s", [Id]),
-%%                        nkfile_app:put_store(nklib_util:to_binary(Id), Store);
-%%                    {error, Error} ->
-%%                        lager:warning("NkFILE: could not load store ~p: ~p", [Data, Error])
-%%                end;
-%%            (Data) ->
-%%                lager:warning("NkFILE: invalid store: ~p", [Data])
-%%        end,
-%%        nkfile_app:get(stores, [])),
-%%    {ok, State}.
 
 
 
@@ -81,6 +60,27 @@ error(_)                                -> continue.
 %% ===================================================================
 %% Mail callbacks
 %% ===================================================================
+
+
+%% @doc
+-spec nkfile_parse_meta(nkservice:id(), nkservice:package_id(), binary(), nkfile:meta()) ->
+    {ok, nkfile:meta()} | {error, term()}.
+
+nkfile_parse_meta(_SrvId, _PackageId, _Class, Meta) ->
+    % Fields used by most plugins
+    Syntax = #{
+        id => binary,
+        name => binary,
+        password => binary,
+        contentType => binary,
+        path => binary
+    },
+    case nklib_syntax:parse(Meta, Syntax, #{allow_unknown=>true}) of
+        {ok, Parsed, _} ->
+            {ok, Parsed};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 
 %% @doc Stores the file
