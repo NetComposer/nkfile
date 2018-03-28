@@ -59,32 +59,26 @@ start() ->
                 config => #{
                     storageClass => s3,
                     targets => [
-%%                        #{
-%%                            url => "http://localhost:9000",
-%%                            weight => 1,
-%%                            pool => 2
-%%                        },
-%%                        #{
-%%                            url => "http://127.0.0.2:9000",
-%%                            weight => 2,
-%%                            pool => 2
-%%                        },
                         #{
-                            url => "https://s3-eu-west-1.amazonaws.com",
+                            url => "http://localhost:9000",
+                            weight => 1,
+                            pool => 2
+                        },
+                        #{
+                            url => "http://127.0.0.2:9000",
+                            weight => 2,
                             pool => 2
                         }
+%%                        #{
+%%                            url => "https://s3-eu-west-1.amazonaws.com",
+%%                            pool => 2,
+%%                            opts => #{tls_verify=>host, debug=>false}
+%%                        }
 
                     ],
-%%                    s3_id => "5UBED0Q9FB7MFZ5EWIOJ",
-%%                    s3_secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-%%                    s3_bucket => bucket1,
-
-                    s3_id => "AKIAJZ7VECSGCJVB6JIQ",
-                    s3_secret => "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",
-                    s3_bucket => <<"carlos-publico">>,
-
-
-
+                    s3_id => "5UBED0Q9FB7MFZ5EWIOJ",
+                    s3_secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+                    s3_bucket => bucket1,
                     encryption => aes_cfb128,
                     debug => true
                 }
@@ -132,20 +126,16 @@ opts() ->
 
 
 
-test() ->
+test_filesystem() ->
     {ok, #{file_path:=_}} = nkfile:upload(?SRV, file1, <<"123">>, #{name=>n1}),
     {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file1, #{name=>n1}),
 
     {ok, #{password:=Pass}} = nkfile:upload(?SRV, file2, <<"321">>, #{name=>n2}),
     {error, missing_password} = nkfile:download(?SRV, file2, #{name=>n2}),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, file2, #{name=>n2, password=>Pass}),
-
-    {ok, #{password:=Pass}} = nkfile:upload(?SRV, s3, <<"321">>, #{name=>n3}),
-    {error, missing_password} = nkfile:download(?SRV, s3, #{name=>n2}),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, s3, #{name=>n3, password=>Pass}).
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file2, #{name=>n2, password=>Pass}).
 
 
-test2() ->
+test_s3() ->
     {ok, #{password:=Pass}} = nkfile:upload(?SRV, s3, <<"321">>, #{name=>n3}),
     {error, missing_password} = nkfile:download(?SRV, s3, #{name=>n3}),
     {ok, <<"321">>, _} = nkfile:download(?SRV, s3, #{name=>n3, password=>Pass}).

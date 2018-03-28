@@ -84,7 +84,6 @@ nkfile_download(SrvId, PackageId, s3, #{name:=Name}=Meta) ->
     Path2 = filename:join(Path1, to_bin(Name)),
     case nkpacket_pool:get_conn_pid({nkfile_s3, SrvId, PackageId}) of
         {ok, ConnPid, #{url:=Url}} ->
-            lager:error("NKLOG USING CONNPID ~p", [ConnPid]),
             S3 = nkservice_util:get_cache(SrvId, {nkfile_s3, PackageId, config}),
             S3Config1 = maps:with([key_id, key], S3),
             S3Config2 = S3Config1#{host=>Url},
