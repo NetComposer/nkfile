@@ -51,7 +51,7 @@ start() ->
 
 %% @private OTP standard start callback
 start(_Type, _Args) ->
-    Syntax = #{stores => {list, map}},
+    Syntax = #{},
     case nklib_config:load_env(?APP, Syntax) of
         {ok, _} ->
             {ok, Vsn} = application:get_key(?APP, vsn),
