@@ -53,7 +53,7 @@
 
 upload(SrvId, PackageId, FileBody, Meta) ->
     PackageId2 = nklib_util:to_binary(PackageId),
-    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
+    Class = nkservice_util:get_cache(SrvId, nkfile, PackageId2, storage_class),
     case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
         {ok, Meta2} ->
             case get_body(SrvId, PackageId2, FileBody) of
@@ -79,7 +79,7 @@ upload(SrvId, PackageId, FileBody, Meta) ->
 
 download(SrvId, PackageId, Meta) ->
     PackageId2 = nklib_util:to_binary(PackageId),
-    Class = nkservice_util:get_cache(SrvId, {nkfile, PackageId2, storage_class}),
+    Class = nkservice_util:get_cache(SrvId, nkfile, PackageId2, storage_class),
     case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
         {ok, Meta2} ->
             case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId2, Class, Meta2]) of
@@ -132,7 +132,7 @@ get_body(SrvId, PackageId, {base64, Base64}) ->
     end;
 
 get_body(SrvId, PackageId, Bin) when is_binary(Bin) ->
-    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, max_size}) of
+    case nkservice_util:get_cache(SrvId, nkfile, PackageId, max_size) of
         0 ->
             {ok, Bin};
         Size when byte_size(Bin) > Size ->
@@ -147,7 +147,7 @@ get_body(_SrvId, _PackageId, _FileBody) ->
 
 %% @private
 encrypt(SrvId, PackageId, Bin, Meta) ->
-    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, encryption}) of
+    case nkservice_util:get_cache(SrvId, nkfile, PackageId, encryption) of
         none ->
             {ok, Bin, Meta};
         aes_cfb128 ->
@@ -165,7 +165,7 @@ encrypt(SrvId, PackageId, Bin, Meta) ->
 
 %% @doc
 decrypt(SrvId, PackageId, Bin, Meta) ->
-    case nkservice_util:get_cache(SrvId, {nkfile, PackageId, encryption}) of
+    case nkservice_util:get_cache(SrvId, nkfile, PackageId, encryption) of
         none ->
             {ok, Bin, Meta};
         aes_cfb128 ->

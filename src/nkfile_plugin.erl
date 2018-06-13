@@ -65,24 +65,21 @@ plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
 	},
 	case nklib_syntax:parse(Config, Syntax, #{allow_unknown=>true}) of
 		{ok, Parsed, _} ->
+            DebugMap1 = nkservice_config_util:get_debug_map(Spec),
 			Debug = maps:get(debug, Parsed, false),
-            DebugMap1 = maps:get(debug_map, Spec, #{}),
-			DebugMap2 = DebugMap1#{{nkfile, Id, debug} => Debug},
-            CacheMap1 = maps:get(cache_map, Spec, #{}),
-            case maps:is_key({nkfile, Id, storage_class}, CacheMap1) of
-                true ->
-                    CacheMap2 = CacheMap1#{
-                        {nkfile, Id, max_size} => maps:get(maxSize, Parsed, 0),
-                        {nkfile, Id, encryption} => maps:get(encryption, Parsed, none)
-                    },
-                    Spec2 = Spec#{
-                        config := Parsed,
-                        cache_map => CacheMap2,
-                        debug_map => DebugMap2
-                    },
-                    {ok, Spec2};
-                false ->
-                    {error, unknown_storage_class}
+ 			DebugMap2 = nkservice_config_util:set_debug_key(nkfile, Id, debug, Debug, DebugMap1),
+            Spec2 = nkservice_config_util:set_debug_map(DebugMap2, Spec),
+            CacheMap1 = nkservice_config_util:get_cache_map(Spec2),
+            case nkservice_config_util:get_cache_key(nkfile, Id, storage_class, CacheMap1) of
+                undefined ->
+                    {error, unknown_storage_class};
+                _ ->
+                    MaxSize = maps:get(maxSize, Parsed, 0),
+                    Enc = maps:get(encryption, Parsed, none),
+                    CacheMap2 = nkservice_config_util:set_cache_key(nkfile, Id, max_size, MaxSize, CacheMap1),
+                    CacheMap3 = nkservice_config_util:set_cache_key(nkfile, Id, encryption, Enc, CacheMap2),
+                    Spec3 = nkservice_config_util:set_cache_map(CacheMap3, Spec2),
+                    {ok, Spec3#{config:=Parsed}}
             end;
 		{error, Error} ->
 			{error, Error}

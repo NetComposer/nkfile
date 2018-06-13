@@ -48,7 +48,7 @@
 nkfile_upload(SrvId, PackageId, filesystem, Bin, Meta) ->
     case Meta of
         #{name:=Name} ->
-            Path = nkservice_util:get_cache(SrvId, {nkfile_filesystem, PackageId, file_path}),
+            Path = nkservice_util:get_cache(SrvId, nkfile_filesystem, PackageId, file_path),
             Path2 = filename:join(Path, Name),
             case file:write_file(Path2, Bin) of
                 ok ->
@@ -70,7 +70,7 @@ nkfile_upload(_SrvId, _PackageId, _StorageClass, _Bin, _Meta) ->
 nkfile_download(SrvId, PackageId, filesystem, Meta) ->
     case Meta of
         #{name:=Name} ->
-            Path = nkservice_util:get_cache(SrvId, {nkfile_filesystem, PackageId, file_path}),
+            Path = nkservice_util:get_cache(SrvId, nkfile_filesystem, PackageId, file_path),
             Path2 = filename:join(Path, Name),
             case file:read_file(Path2) of
                 {ok, Body} ->

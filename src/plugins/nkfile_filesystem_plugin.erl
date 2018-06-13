@@ -57,14 +57,13 @@ plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
         {ok, #{storageClass := <<"filesystem">>}=Parsed, _} ->
             case Parsed of
                 #{filePath:=Path} ->
-                    CacheMap1 = maps:get(cache_map, Spec, #{}),
-                    CacheMap2 = CacheMap1#{
-                        {nkfile, Id, storage_class} => filesystem,
-                        {nkfile_filesystem, Id, file_path} => Path
-                    },
-                    {ok, Spec#{config:=Parsed, cache_map=>CacheMap2}};
+                    CacheMap1 = nkservice_config_util:get_cache_map(Spec),
+                    CacheMap2 = nkservice_config_util:set_cache_key(nkfile, Id, storage_class, filesystem, CacheMap1),
+                    CacheMap3 = nkservice_config_util:set_cache_key(nkfile_filesystem, Id, file_path, Path, CacheMap2),
+                    Spec2 = nkservice_config_util:set_cache_map(CacheMap3, Spec),
+                    {ok, Spec2#{config:=Parsed}};
                 _ ->
-                    {error, {missing_field, <<Id/binary, ".config.filePath">>}}
+                    {error, {field_missing, <<Id/binary, ".config.filePath">>}}
             end;
         {ok, _, _} ->
             continue;
