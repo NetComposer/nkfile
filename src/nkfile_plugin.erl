@@ -42,7 +42,7 @@ plugin_deps() ->
 	[].
 
 %% @doc
-plugin_api(?PKG_FILE) ->
+plugin_api(?PKG_CLASS_FILE) ->
 	#{
 		luerl => #{
 			upload => {nkfile, luerl_upload},
@@ -55,7 +55,7 @@ plugin_api(_Class) ->
 
 
 %% @doc
-plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
+plugin_config(?PKG_CLASS_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
     Syntax = #{
         storageClass => binary,
         maxSize => {integer, 1, none},

@@ -48,7 +48,7 @@ plugin_deps() ->
 
 
 %% @doc
-plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
+plugin_config(?PKG_CLASS_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
 	Syntax = #{
         storageClass => binary,
         filePath => binary

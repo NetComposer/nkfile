@@ -39,7 +39,7 @@ plugin_deps() ->
 
 
 %% @doc
-plugin_config(?PKG_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
+plugin_config(?PKG_CLASS_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
     case nklib_syntax:parse(Config, #{storageClass=>binary}) of
         {ok, #{storageClass:=<<"s3">>}, _} ->
             Syntax = #{
@@ -87,7 +87,7 @@ plugin_config(_Class, _Package, _Service) ->
 
 
 %% @doc
-plugin_start(?PKG_FILE, #{id:=Id, config:=Config}, Pid, Service) ->
+plugin_start(?PKG_CLASS_FILE, #{id:=Id, config:=Config}, Pid, Service) ->
     case Config of
         #{storageClass:=<<"s3">>} ->
             insert(Id, Config, Pid, Service);
@@ -101,7 +101,7 @@ plugin_start(_Id, _Spec, _Pid, _Service) ->
 
 %% @doc
 %% Even if we are called only with modified config, we check if the spec is new
-plugin_update(?PKG_FILE, #{id:=Id, config:=NewConfig}, OldSpec, Pid, Service) ->
+plugin_update(?PKG_CLASS_FILE, #{id:=Id, config:=NewConfig}, OldSpec, Pid, Service) ->
     case NewConfig of
         #{storageClass:=<<"s3">>} ->
             case OldSpec of
