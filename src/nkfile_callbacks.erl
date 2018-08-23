@@ -23,7 +23,7 @@
 -module(nkfile_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([error/1]).
+-export([msg/1]).
 -export([nkfile_parse_meta/4, nkfile_upload/4, nkfile_download/3]).
 
 -include("nkfile.hrl").
@@ -44,16 +44,16 @@
 %% ===================================================================
 
 %% @doc
-error(base64_decode_error)              -> "BASE64 decode error";
-error(decryption_error)                 -> "Decryption error";
-error(encryption_error)                 -> "Encryption error";
-error(file_read_error)                  -> "File read error";
-error(file_write_error)                 -> "File write error";
-error(invalid_file_body)                -> "Invalid file body";
-error(invalid_store)                    -> "Invalid store";
-error({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
-error({unknown_encryption_algo, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
-error(_)                                -> continue.
+msg(base64_decode_error)              -> "BASE64 decode error";
+msg(decryption_error)                 -> "Decryption error";
+msg(encryption_error)                 -> "Encryption error";
+msg(file_read_error)                  -> "File read error";
+msg(file_write_error)                 -> "File write error";
+msg(invalid_file_body)                -> "Invalid file body";
+msg(invalid_store)                    -> "Invalid store";
+msg({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
+msg({unknown_encryption_algo, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
+msg(_)                                -> continue.
 
 
 

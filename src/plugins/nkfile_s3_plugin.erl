@@ -64,16 +64,11 @@ plugin_config(?PKG_CLASS_FILE, #{id:=Id, config:=Config}=Spec, _Service) ->
                         key => maps:get(s3_Secret, Parsed),
                         bucket => maps:get(bucket, Parsed)
                     },
-                    CacheMap1 = maps:get(cache_map, Spec, #{}),
-                    CacheMap2 = CacheMap1#{
-                        {nkfile, Id, storage_class} => s3,
-                        {nkfile_s3, Id, config} => S3Config
-                    },
-                    Spec2 = Spec#{
-                        config := Parsed,
-                        cache_map => CacheMap2
-                    },
-                    {ok, Spec2};
+                    CacheMap1 = nkservice_config_util:get_cache_map(Spec),
+                    CacheMap2 = nkservice_config_util:set_cache_key(nkfile, Id, storage_class, s3, CacheMap1),
+                    CacheMap3 = nkservice_config_util:set_cache_key(nkfile_s3, Id, config, S3Config, CacheMap2),
+                    Spec2 = nkservice_config_util:set_cache_map(CacheMap3, Spec),
+                    {ok, Spec2#{config:=Parsed}};
                 {error, Error} ->
                     {error, Error}
             end;
