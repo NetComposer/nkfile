@@ -52,7 +52,7 @@ msg(file_write_error)                 -> "File write error";
 msg(invalid_file_body)                -> "Invalid file body";
 msg(invalid_store)                    -> "Invalid store";
 msg({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
-msg({unknown_encryption_algo, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
+msg({encryption_algo_unknown, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
 msg(_)                                -> continue.
 
 
@@ -73,9 +73,10 @@ nkfile_parse_meta(_SrvId, _PackageId, _Class, Meta) ->
         name => binary,
         password => binary,
         contentType => binary,
-        path => binary
+        path => binary,
+        '__allow_unknown' => true
     },
-    case nklib_syntax:parse(Meta, Syntax, #{allow_unknown=>true}) of
+    case nklib_syntax:parse(Meta, Syntax) of
         {ok, Parsed, _} ->
             {ok, Parsed};
         {error, Error} ->

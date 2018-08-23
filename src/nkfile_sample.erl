@@ -36,63 +36,67 @@ start() ->
         plugins => [nkfile_filesystem, nkfile_s3],
         packages => [
             #{
-                id => file1,
+                id => file_pkg,
                 class => 'File',
                 config => #{
-                    storageClass => filesystem,
-                    filePath => "/tmp",
-                    debug => true
-                }
-            },
-            #{
-                id => file2,
-                class => 'File',
-                config => #{
-                    storageClass => filesystem,
-                    filePath => "/tmp",
-                    encryption => aes_cfb128
-                }
-            },
-            #{
-                id => s3,
-                class => 'File',
-                config => #{
-                    storageClass => s3,
-                    targets => [
+                    fileProviders => [
                         #{
-                            url => "http://localhost:9000",
-                            weight => 1,
-                            pool => 2
+                            id => file1,
+                            storageClass => filesystem,
+                            filePath => "/tmp",
+                            debug => true
                         },
                         #{
-                            url => "http://127.0.0.2:9000",
-                            weight => 2,
-                            pool => 2
+                            id => file2,
+                            storageClass => filesystem,
+                            filePath => "/tmp",
+                            encryption => aes_cfb128
+                        },
+                        #{
+                            id => s3,
+                            storageClass => s3,
+                            targets => [
+                                #{
+                                    url => "http://localhost:9000",
+                                    weight => 1,
+                                    pool => 2
+                                },
+                                #{
+                                    url => "http://127.0.0.2:9000",
+                                    weight => 2,
+                                    pool => 2
+                                }
+%%                              #{
+%%                                  url => "https://s3-eu-west-1.amazonaws.com",
+%%                                  pool => 2,
+%%                                  opts => #{tls_verify=>host, debug=>false}
+%%                              }
+                            ],
+                            s3_Id => "5UBED0Q9FB7MFZ5EWIOJ",
+                            s3_Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+                            bucket => bucket1,
+                            encryption => aes_cfb128,
+                            debug => true
                         }
-%%                        #{
-%%                            url => "https://s3-eu-west-1.amazonaws.com",
-%%                            pool => 2,
-%%                            opts => #{tls_verify=>host, debug=>false}
-%%                        }
-                    ],
-                    s3_Id => "5UBED0Q9FB7MFZ5EWIOJ",
-                    s3_Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-                    bucket => bucket1,
-                    encryption => aes_cfb128,
-                    debug => true
+                    ]
                 }
             }
-        ],
-        modules => [
-            #{
-                id => s1,
-                class => luerl,
-                code => s1(),
-                debug => true
-            }
         ]
+%%        modules => [
+%%            #{
+%%                id => s1,
+%%                class => luerl,
+%%                code => s1(),
+%%                debug => true
+%%            }
+%%        ]
     },
     nkservice:start(?SRV, Spec).
+
+%% Export MINIO
+%% export MINIO_ACCESS_KEY=5UBED0Q9FB7MFZ5EWIOJ
+%% export MINIO_SECRET_KEY=CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI
+%% minio server http://127.0.0.1:9000/tmp
 
 
 %% @doc Stops the service
@@ -125,24 +129,22 @@ s1() -> <<"
 ">>.
 
 
-opts() ->
-    nkservice_util:get_cache(?SRV, nkelastic, <<"es1">>, opts).
-
-
 
 
 test_filesystem() ->
-    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file1, <<"123">>, #{name=>n1}),
-    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file1, #{name=>n1}),
+    FileMeta1 = #{name=>n1, contentType=>any},
+    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, file1, FileMeta1, <<"123">>),
+    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, file1, FileMeta1),
 
-    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file2, <<"321">>, #{name=>n2}),
-    {error, missing_password} = nkfile:download(?SRV, file2, #{name=>n2}),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, file2, #{name=>n2, password=>Pass}).
+    FileMeta2 = #{name=>n1, contentType=>any},
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, file2, FileMeta2, <<"321">>),
+    {error, password_missing} = nkfile:download(?SRV, file_pkg, file2, FileMeta2),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, file2, FileMeta2#{password=>Pass}).
 
 
 test_s3() ->
-    {ok, #{password:=Pass}} = nkfile:upload(?SRV, s3, <<"321">>, #{name=>n3}),
-    {error, missing_password} = nkfile:download(?SRV, s3, #{name=>n3}),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, s3, #{name=>n3, password=>Pass}).
+    FileMeta3 = #{name=>n3, contentType=>any},
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, s3, FileMeta3, <<"321">>),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, s3, FileMeta3#{password=>Pass}).
 
 

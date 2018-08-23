@@ -18,17 +18,17 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc NkFILE
+%% @doc NkFILE main library
 
 -module(nkfile).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([upload/4, download/3]).
+-export([parse_file_meta/1, parse_provider_spec/3]).
+-export([upload/5, download/4]).
 -export([luerl_upload/3, luerl_download/3]).
+
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
-
--define(IV, <<"NetComposerFile.">>).
 
 
 %% ===================================================================
@@ -36,60 +36,115 @@
 %% ===================================================================
 
 
--type file_body() :: {base64, binary()} | binary() | term().
+%% @doc A file body
+-type file_body() :: {base64, binary()} | binary().
 
 
-%% Options dependant of storage class
-%% @see nkfile_parse_meta
--type meta() :: map().
+%% @see A file metadata
+-type file_meta() ::
+    #{
+        id => binary(),
+        name => binary(),
+        password => binary(),
+        contentType => binary(),
+        path => binary()
+    }.
+
+%% @see result_meta/0 types in providers
+-type result_meta() ::
+    #{
+        password => binary()
+
+    }.
+
+
 
 %% ===================================================================
 %% Public
 %% ===================================================================
 
-%% @doc Sends a file to the backend
--spec upload(nkservice:id(), nkservice:package_id(), file_body(), meta()) ->
-    {ok, meta()} | {error, term()}.
 
-upload(SrvId, PackageId, FileBody, Meta) ->
-    PackageId2 = nklib_util:to_binary(PackageId),
-    Class = nkservice_util:get_cache(SrvId, nkfile, PackageId2, storage_class),
-    case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
-        {ok, Meta2} ->
-            case get_body(SrvId, PackageId2, FileBody) of
-                {ok, BinBody1} ->
-                    case encrypt(SrvId, PackageId2, BinBody1, Meta2) of
-                        {ok, BinBody2, Meta3} ->
-                            ?CALL_SRV(SrvId, nkfile_upload,
-                                      [SrvId, PackageId2, Class, BinBody2, Meta3]);
-                        {error, Error} ->
-                            {error, Error}
-                    end;
-                {error, Error} ->
-                    {error, Error}
-            end;
-        {error, Error} ->
-            {error, Error}
+
+%% @doc Check for valid nkfile:file_meta()
+-spec parse_file_meta(map()) ->
+    {ok, file_meta()} | {error, term()}.
+
+parse_file_meta(Meta) ->
+    nkfile_util:parse_file_meta(Meta).
+
+
+%% @doc Checks that an user-defined provider spec is valid
+-spec parse_provider_spec(nkservice:id(), nkservice:package_id(), map()) ->
+    {ok, nkfile_provider:spec()} | {error, term()}.
+
+parse_provider_spec(SrvId, PackageId, #{storageClass:=Class}=Meta) ->
+    case catch nkfile_plugin:get_class_module(SrvId, PackageId, Class) of
+        {'EXIT', _} ->
+            {error, {storage_class_unknown, Class}};
+        Module ->
+            nkfile_provider:parse_spec(Module, Meta)
     end.
 
 
-%% @doc
--spec download(nkservice:id(), nkpackage:id(), meta()) ->
-    {ok, binary(), meta()} | {error, term()}.
 
-download(SrvId, PackageId, Meta) ->
-    PackageId2 = nklib_util:to_binary(PackageId),
-    Class = nkservice_util:get_cache(SrvId, nkfile, PackageId2, storage_class),
-    case ?CALL_SRV(SrvId, nkfile_parse_meta, [SrvId, PackageId, Class, Meta]) of
-        {ok, Meta2} ->
-            case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId2, Class, Meta2]) of
-                {ok, Bin1, Meta3} ->
-                    decrypt(SrvId, PackageId2, Bin1, Meta3);
+%% @doc Sends a file to the provider defined destination
+%% If the provider is defined in the package, use the second version
+%% If you have a provider defined elsewhere, use the first option, but use
+%% nkfile_provider:parse_spec/1
+%% Use parse_meta/1 to check file's meta
+-spec upload(nkservice:id(), nkservice:package_id(), nkfile_provider:spec(), file_meta(), file_body()) ->
+    {ok, result_meta()} | {error, term()}.
+
+upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) when is_map(ProviderSpec) ->
+    case nkfile_provider:encode_body(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) of
+        {ok, File2, Meta2} ->
+            case nkfile_provider:upload(SrvId, PackageId, ProviderSpec, FileMeta, File2) of
+                {ok, Meta3} ->
+                    {ok, maps:merge(Meta2, Meta3)};
                 {error, Error} ->
                     {error, Error}
             end;
         {error, Error} ->
             {error, Error}
+    end;
+
+upload(SrvId, PackageId, ProviderId, FileMeta, FileBody) ->
+    case nkfile_provider:get_spec(SrvId, PackageId, ProviderId) of
+        undefined ->
+            {error, {provider_unknown, ProviderId}};
+        ProviderSpec when is_map(ProviderSpec) ->
+            upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody)
+    end.
+
+
+
+%% @doc Sends a file to the provider defined destination
+%% If the provider is defined in the package, use the second version
+%% If you have a provider defined elsewhere, use the first option, but use
+%% nkfile_provider:parse_spec/1
+%% Use parse_meta/1 to check file's meta
+-spec download(nkservice:id(), nkservice:package_id(), nkfile_provider:spec(), file_meta()) ->
+    {ok, binary(), result_meta()} | {error, term()}.
+
+download(SrvId, PackageId, ProviderSpec, FileMeta) when is_map(ProviderSpec) ->
+    case nkfile_provider:download(SrvId, PackageId, ProviderSpec, FileMeta) of
+        {ok, File1, Meta1} ->
+            case nkfile_provider:decode_body(SrvId, PackageId, ProviderSpec, FileMeta, File1) of
+                {ok, File2, Meta2} ->
+                    {ok, File2, maps:merge(Meta1, Meta2)};
+                {error, Error} ->
+                    {error, Error}
+            end;
+        {error, Error} ->
+            {error, Error}
+    end;
+
+download(SrvId, PackageId, ProviderId, FileMeta) ->
+    case nkfile_provider:get_spec(SrvId, PackageId, ProviderId) of
+        undefined ->
+            {error, {provider_unknown, ProviderId}};
+        ProviderSpec when is_map(ProviderSpec) ->
+            download(SrvId, PackageId, ProviderSpec, FileMeta)
     end.
 
 
@@ -98,9 +153,9 @@ download(SrvId, PackageId, Meta) ->
 %% ===================================================================
 
 %% @private
-luerl_upload(SrvId, PackageId, [Body, Meta]) ->
+luerl_upload(SrvId, PackageId, [ProviderId, Meta, Body]) ->
     lager:error("NKLOG MM ~p", [Meta]),
-    case upload(SrvId, PackageId, Body, Meta) of
+    case upload(SrvId, PackageId, ProviderId, Meta, Body) of
         {ok, Meta2} ->
             [<<"ok">>, Meta2];
         {error, Error} ->
@@ -109,78 +164,11 @@ luerl_upload(SrvId, PackageId, [Body, Meta]) ->
 
 
 %% @private
-luerl_download(SrvId, PackageId, [Meta]) ->
-    case download(SrvId, PackageId, Meta) of
+luerl_download(SrvId, PackageId, [ProviderId, Meta]) ->
+    case download(SrvId, PackageId, ProviderId, Meta) of
         {ok, Body, Meta2} ->
             [Body, Meta2];
         {error, Error} ->
             {error, Error}
     end.
 
-
-%% ===================================================================
-%% Internal
-%% ===================================================================
-
-%% @private
-get_body(SrvId, PackageId, {base64, Base64}) ->
-    case catch base64:decode(Base64) of
-        {'EXIT', _} ->
-            {error, base64_decode_error};
-        Bin ->
-            get_body(SrvId, PackageId, Bin)
-    end;
-
-get_body(SrvId, PackageId, Bin) when is_binary(Bin) ->
-    case nkservice_util:get_cache(SrvId, nkfile, PackageId, max_size) of
-        0 ->
-            {ok, Bin};
-        Size when byte_size(Bin) > Size ->
-            {error, file_too_large};
-        _ ->
-            {ok, Bin}
-    end;
-
-get_body(_SrvId, _PackageId, _FileBody) ->
-    {error, invalid_file_body}.
-
-
-%% @private
-encrypt(SrvId, PackageId, Bin, Meta) ->
-    case nkservice_util:get_cache(SrvId, nkfile, PackageId, encryption) of
-        none ->
-            {ok, Bin, Meta};
-        aes_cfb128 ->
-            Pass = maps:get(password, Meta, crypto:strong_rand_bytes(16)),
-            case catch crypto:block_encrypt(aes_cfb128, Pass, ?IV, Bin) of
-                {'EXIT', _} ->
-                    {error, encryption_error};
-                Bin2 ->
-                    {ok, Bin2, Meta#{password=>base64:encode(Pass)}}
-            end;
-        Other ->
-            {error, {unknown_encryption_algo, Other}}
-    end.
-
-
-%% @doc
-decrypt(SrvId, PackageId, Bin, Meta) ->
-    case nkservice_util:get_cache(SrvId, nkfile, PackageId, encryption) of
-        none ->
-            {ok, Bin, Meta};
-        aes_cfb128 ->
-            case Meta of
-                #{password:=Pass} ->
-                    Pass2 = base64:decode(Pass),
-                    case catch crypto:block_decrypt(aes_cfb128, Pass2, ?IV, Bin) of
-                        {'EXIT', _} ->
-                            {error, decryption_error};
-                        Bin2 ->
-                            {ok, Bin2, Meta}
-                    end;
-                _ ->
-                    {error, missing_password}
-            end;
-        Other ->
-            {error, {unknown_encryption_algo, Other}}
-    end.
