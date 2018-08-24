@@ -164,9 +164,7 @@ get_connection(ProviderSpec) ->
                     {ok, Url, ConnPid, Opts};
                 {error, Error} ->
                     {error, Error}
-            end;
-        _ ->
-            {error, url_is_missing}
+            end
     end.
 
 
