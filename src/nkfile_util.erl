@@ -23,7 +23,7 @@
 -module(nkfile_util).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([parse_file_meta/1, decode_base64/1, check_size/2, encrypt/2, decrypt/3]).
+-export([parse_file_meta/1, check_size/3, set_hash/3, encrypt/3, decrypt/3, check_hash/3]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -60,61 +60,56 @@ parse_file_meta(Meta) ->
     end.
 
 
-%% @private Convert to raw if Base64 and check max_size
-decode_base64({base64, Base64}) ->
-    case catch base64:decode(Base64) of
-        {'EXIT', _} ->
-            {error, base64_decode_error};
-        Bin ->
-            {ok, Bin}
-    end;
-
-decode_base64(Bin) when is_binary(Bin) ->
-    {ok, Bin}.
+%% @private
+check_size(ProviderSpec, _FileMeta, Bin) ->
+    MaxSize = maps:get(maxSize, ProviderSpec, 0),
+    MaxSize==0 orelse byte_size(Bin) =< MaxSize.
 
 
 %% @private
-check_size(#{maxSize:=MaxSize}, Bin) when MaxSize > 0 ->
-    case byte_size(Bin) =< MaxSize of
-        true ->
-            ok;
-        false ->
-            {error, file_too_large}
-    end;
-
-check_size(_ProviderSpec, _Bin) ->
-    ok.
+set_hash(ProviderSpec, FileMeta, Bin) ->
+    case maps:find(hash, ProviderSpec) of
+        {ok, sha256} ->
+            Hash = base64:encode(crypto:hash(sha256, Bin)),
+            {ok, FileMeta#{hash => Hash}};
+        {ok, Other} ->
+            {error, {hash_algo_unknown, Other}};
+        error ->
+            {ok, FileMeta}
+    end.
 
 
 %% @private
-encrypt(#{encryption:=Algo}, Bin) ->
-    case Algo of
-        aes_cfb128 ->
+encrypt(ProviderSpec, FileMeta, Bin) ->
+    case maps:find(encryption, ProviderSpec) of
+        {ok, aes_cfb128} ->
             Start = nklib_date:epoch(usecs),
-            Pass = crypto:strong_rand_bytes(16),
+            Pass = case maps:find(password, FileMeta) of
+                error ->
+                    crypto:strong_rand_bytes(16);
+                Pass0 ->
+                    base64:decode(Pass0)
+            end,
             case catch crypto:block_encrypt(aes_cfb128, Pass, ?IV, Bin) of
                 {'EXIT', _} ->
                     {error, encryption_error};
                 Bin2 ->
-                    Meta = #{
-                        password => base64:encode(Pass),
-                        crypt_usecs => nklib_date:epoch(usecs) - Start
-                    },
-                    {ok, Bin2, Meta}
+                    FileMeta2 = FileMeta#{password => base64:encode(Pass)},
+                    Meta = #{crypt_usecs => nklib_date:epoch(usecs) - Start},
+                    {ok, FileMeta2, Bin2, Meta}
             end;
-        Other ->
-            {error, {encryption_algo_unknown, Other}}
-    end;
-
-encrypt(_, Bin) ->
-    {ok, Bin, #{}}.
+        {ok, Other} ->
+            {error, {encryption_algo_unknown, Other}};
+        error ->
+            {ok, FileMeta, Bin, #{}}
+    end.
 
 
 %% @private
-decrypt(#{encryption:=Algo}, Meta, Bin) ->
-    case Algo of
-        aes_cfb128 ->
-            case Meta of
+decrypt(ProviderSpec, FileMeta, Bin) ->
+    case maps:find(encryption, ProviderSpec) of
+        {ok, aes_cfb128} ->
+            case FileMeta of
                 #{password:=Pass} ->
                     Start = nklib_date:epoch(usecs),
                     Pass2 = base64:decode(Pass),
@@ -130,12 +125,36 @@ decrypt(#{encryption:=Algo}, Meta, Bin) ->
                 _ ->
                     {error, password_missing}
             end;
-        Other ->
-            {error, {encryption_algo_unknown, Other}}
-    end;
+        {ok, Other} ->
+            {error, {encryption_algo_unknown, Other}};
+        error ->
+            {ok, Bin, #{}}
+    end.
 
-decrypt(_, _Meta, Bin) ->
-    {ok, Bin, #{}}.
+
+%% @private
+check_hash(ProviderSpec, FileMeta, Bin) ->
+    case maps:find(hash, ProviderSpec) of
+        {ok, sha256} ->
+            case FileMeta of
+                #{hash:=Hash1} ->
+                    Hash2 = base64:decode(Hash1),
+                    case Hash2 == crypto:hash(sha256, Bin) of
+                        true ->
+                            ok;
+                        false ->
+                            {error, hash_invalid}
+                    end;
+                _ ->
+                    {error, hash_is_missing}
+            end;
+        {ok, Other} ->
+            {error, {hash_algo_unknown, Other}};
+        error ->
+            ok
+    end.
+
+
 
 
 %%%% @private

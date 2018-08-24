@@ -37,7 +37,7 @@
 
 
 %% @doc A file body
--type file_body() :: {base64, binary()} | binary().
+-type file_body() :: binary().
 
 
 %% @see A file metadata
@@ -45,9 +45,10 @@
     #{
         id => binary(),
         name => binary(),
-        password => binary(),
         contentType => binary(),
-        path => binary()
+        path => binary(),
+        sha256 => binary(),
+        password => binary()
     }.
 
 %% @see result_meta/0 types in providers
@@ -93,14 +94,14 @@ parse_provider_spec(SrvId, PackageId, #{storageClass:=Class}=Meta) ->
 %% nkfile_provider:parse_spec/1
 %% Use parse_meta/1 to check file's meta
 -spec upload(nkservice:id(), nkservice:package_id(), nkfile_provider:spec(), file_meta(), file_body()) ->
-    {ok, result_meta()} | {error, term()}.
+    {ok, file_meta(), result_meta()} | {error, term()}.
 
 upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) when is_map(ProviderSpec) ->
     case nkfile_provider:encode_body(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) of
-        {ok, File2, Meta2} ->
-            case nkfile_provider:upload(SrvId, PackageId, ProviderSpec, FileMeta, File2) of
-                {ok, Meta3} ->
-                    {ok, maps:merge(Meta2, Meta3)};
+        {ok, FileMeta2, Bin, Meta1} ->
+            case nkfile_provider:upload(SrvId, PackageId, ProviderSpec, FileMeta2, Bin) of
+                {ok, Meta2} ->
+                    {ok, FileMeta2, maps:merge(Meta1, Meta2)};
                 {error, Error} ->
                     {error, Error}
             end;

@@ -60,6 +60,7 @@ parse_spec(_Spec) ->
     {syntax, #{
         maxSize => pos_integer,
         encryption => {atom, [aes_cfb128]},
+        hash => {atom, [sha256]},
         debug => boolean,
         url => binary,
         connect_opts => any,        % Supports httpc_pool

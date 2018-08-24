@@ -142,21 +142,21 @@ encode_body(SrvId, PackageId, #{module:=Module}=ProviderSpec, FileMeta, File) ->
         true ->
             Module:encode_body(SrvId, PackageId, ProviderSpec, FileMeta, File);
         false ->
-            case nkfile_util:decode_base64(File) of
-                {ok, File2} ->
-                    case nkfile_util:check_size(ProviderSpec, File) of
-                        ok ->
-                            case nkfile_util:encrypt(ProviderSpec, File2) of
-                                {ok, File3, Meta} ->
-                                    {ok, File3, Meta};
+            case nkfile_util:check_size(ProviderSpec, FileMeta, File) of
+                true ->
+                    case nkfile_util:set_hash(ProviderSpec, FileMeta, File) of
+                        {ok, FileMeta2} ->
+                            case nkfile_util:encrypt(ProviderSpec, FileMeta2, File) of
+                                {ok, FileMeta3, File3, Meta} ->
+                                    {ok, FileMeta3, File3, Meta};
                                 {error, Error} ->
                                     {error, Error}
                             end;
                         {error, Error} ->
                             {error, Error}
                     end;
-                {error, Error} ->
-                    {error, Error}
+                false ->
+                    {error, file_too_large}
             end
     end.
 
@@ -169,7 +169,12 @@ decode_body(SrvId, PackageId, #{module:=Module}=ProviderSpec, FileMeta, File) ->
         false ->
             case nkfile_util:decrypt(ProviderSpec, FileMeta, File) of
                 {ok, File2, Meta} ->
-                    {ok, File2, Meta};
+                    case nkfile_util:check_hash(ProviderSpec, FileMeta, File2) of
+                        ok ->
+                            {ok, File2, Meta};
+                        {error, Error} ->
+                            {error, Error}
+                    end;
                 {error, Error} ->
                     {error, Error}
             end;

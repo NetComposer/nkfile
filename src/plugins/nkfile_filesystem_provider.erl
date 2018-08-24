@@ -60,6 +60,7 @@ parse_spec(_Spec) ->
     {syntax, #{
         maxSize => pos_integer,
         encryption => {atom, [aes_cfb128]},
+        hash => {atom, [sha256]},
         debug => boolean,
         filePath => binary,
         '__mandatory' => [filePath],
@@ -76,7 +77,7 @@ upload(_SrvId, _PackageId, ProviderSpec, FileMeta, FileBin) ->
     WritePath = filename:join([ProviderPath, FilePath, Name]),
     case file:write_file(WritePath, FileBin) of
         ok ->
-            {ok, #{file_path=>FilePath}};
+            {ok, #{file_path=>WritePath}};
         {error, Error} ->
             lager:warning("write error at ~s: ~p", [WritePath, Error]),
             {error, file_write_error}
