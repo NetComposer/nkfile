@@ -55,30 +55,39 @@ start() ->
                         #{
                             id => s3,
                             storageClass => s3,
-                            targets => [
-                                #{
-                                    url => "http://localhost:9000",
-                                    weight => 1,
-                                    pool => 2
-                                },
-                                #{
-                                    url => "http://127.0.0.2:9000",
-                                    weight => 2,
-                                    pool => 2
-                                }
-%%                              #{
-%%                                  url => "https://s3-eu-west-1.amazonaws.com",
-%%                                  pool => 2,
-%%                                  opts => #{tls_verify=>host, debug=>false}
-%%                              }
-                            ],
-                            s3_Id => "5UBED0Q9FB7MFZ5EWIOJ",
-                            s3_Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+                            url => "http://localhost:9000",
+                            s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
+                            s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
                             bucket => bucket1,
                             encryption => aes_cfb128,
                             debug => true
                         }
                     ]
+                }
+            },
+            #{
+                id => pool1,
+                class => 'HttpPool',
+                config => #{
+                    targets => [
+                        #{
+                            url => "http://localhost:9000",
+                            weight => 1,
+                            pool => 2
+                        },
+                        #{
+                            url => "http://192.168.0.9:9000",
+                            weight => 2,
+                            pool => 2
+                        }
+                        %%  #{
+                        %%     url => "https://s3-eu-west-1.amazonaws.com",
+                        %%    pool => 2,
+                        %%   opts => #{tls_verify=>host, debug=>false}
+                        %% }
+                    ],
+                    resolveIntervalSecs => 15000,
+                    debug => true
                 }
             }
         ]
@@ -130,21 +139,82 @@ s1() -> <<"
 
 
 
+% Test filesystem with in-package config
+test_filesystem_1() ->
+    FileMeta = #{name=>n1, contentType=>any},
+    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, file1, FileMeta, <<"123">>),
+    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, file1, FileMeta),
 
-test_filesystem() ->
-    FileMeta1 = #{name=>n1, contentType=>any},
-    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, file1, FileMeta1, <<"123">>),
-    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, file1, FileMeta1),
-
-    FileMeta2 = #{name=>n1, contentType=>any},
-    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, file2, FileMeta2, <<"321">>),
-    {error, password_missing} = nkfile:download(?SRV, file_pkg, file2, FileMeta2),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, file2, FileMeta2#{password=>Pass}).
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, file2, FileMeta, <<"321">>),
+    {error, password_missing} = nkfile:download(?SRV, file_pkg, file2, FileMeta),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, file2, FileMeta#{password=>Pass}).
 
 
-test_s3() ->
+% Test filesystem with external config
+test_filesystem_2() ->
+    BaseProvider1 = #{
+        id => test_fs_2a,
+        storageClass => filesystem,
+        filePath => "/tmp"
+    },
+    {ok, Provider1} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider1),
+    FileMeta = #{name=>n1, contentType=>any},
+    {ok, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, Provider1, FileMeta, <<"123">>),
+    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
+
+    BaseProvider2 = #{
+        id => test_fs_2b,
+        storageClass => filesystem,
+        filePath => "/tmp",
+        encryption => aes_cfb128
+    },
+    {ok, Provider2} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider2),
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, Provider2, FileMeta, <<"321">>),
+    {error, password_missing} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta#{password=>Pass}).
+
+
+% Test s3 with in-package config
+test_s3_1() ->
     FileMeta3 = #{name=>n3, contentType=>any},
     {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, s3, FileMeta3, <<"321">>),
     {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, s3, FileMeta3#{password=>Pass}).
 
 
+% Test s3 with external config
+test_s3_2() ->
+    BaseProvider = #{
+        id => test_s3_2a,
+        storageClass => s3,
+        url => "http://localhost:9000",
+        s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
+        s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+        bucket => bucket1,
+        encryption => aes_cfb128,
+        debug => true
+    },
+    {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
+    FileMeta = #{name=>n3, contentType=>any},
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}).
+
+
+% Test s3 with external config & pool
+test_s3_3() ->
+    BaseProvider = #{
+        id => test_s3_2a,
+        storageClass => s3,
+        url => "http://localhost:9000",
+        s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
+        s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+        bucket => bucket1,
+        encryption => aes_cfb128,
+        debug => true,
+        connection_opts => #{
+            httpc_pool => <<"file_test-pool1">>
+        }
+    },
+    {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
+    FileMeta = #{name=>n3, contentType=>any},
+    {ok, #{password:=Pass}} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}).

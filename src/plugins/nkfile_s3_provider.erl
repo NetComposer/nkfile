@@ -23,11 +23,17 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 -behavior(nkfile_provider).
 
--export([config/0, parse_spec/1, upload/5, download/4, start/4]).
+-export([config/0, parse_spec/1, upload/5, download/4]).
 -export_type([result_meta/0]).
 
 -include("nkfile.hrl").
 -define(LLOG(Type, Txt, Args),lager:Type("NkFILE S3 "++Txt, Args)).
+
+
+
+%% ===================================================================
+%% Types
+%% ===================================================================
 
 %% @doc returned metadata
 -type result_meta() ::
@@ -35,6 +41,11 @@
         s3_headers => map()
     }.
 
+
+
+%% ===================================================================
+%% Provider callbacks
+%% ===================================================================
 
 
 %% @doc
@@ -50,43 +61,36 @@ parse_spec(_Spec) ->
         maxSize => pos_integer,
         encryption => {atom, [aes_cfb128]},
         debug => boolean,
-        targets => {list, #{
-            url => binary,
-            opts => nkpacket_syntax:safe_syntax(),
-            weight => {integer, 1, 1000},
-            pool => {integer, 1, 1000},
-            refresh => boolean,
-            '__mandatory' => [url]
-        }},
-        s3_Id => binary,
-        s3_Secret => binary,
+        url => binary,
+        connect_opts => any,        % Supports httpc_pool
+        s3Key => binary,
+        s3Secret => binary,
         bucket => binary,
-        resolveInterval => {integer, 0, none},
-        '__mandatory' => [targets, s3_Id, s3_Secret, bucket],
+        '__mandatory' => [url, s3Key, s3Secret, bucket],
         '__allow_unknown' =>true
     }}.
 
 
 
 %% @private
-upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBin) ->
+upload(_SrvId, _PackageId, ProviderSpec, FileMeta, FileBin) ->
     #{name:=Name} = FileMeta,
     FilePath1 = maps:get(path, FileMeta, <<"/">>),
     FilePath2 = filename:join(FilePath1, to_bin(Name)),
-    #{s3_Id:=Id, s3_Secret:=Secret, bucket:=Bucket} = ProviderSpec,
-    PoolId = {nkfile_s3, SrvId, PackageId},
-    lager:error("NKLOG pOOL ~p", [PoolId]),
-    case nkpacket_pool:get_conn_pid(PoolId) of
-        {ok, ConnPid, #{url:=Url}} ->
+    #{s3Key:=Key, s3Secret:=Secret, bucket:=Bucket} = ProviderSpec,
+    case get_connection(ProviderSpec) of
+        {ok, Url, ConnPid, ConnOpts} ->
             S3 = #{
-                key_id => Id,
-                key => Secret,
+                key => Key,
+                secret => Secret,
                 bucket => Bucket,
                 host => Url
             },
             Hash = crypto:hash(sha256, FileBin),
             {_Uri, Path, Headers} = nkpacket_httpc_s3:put_object(Bucket, FilePath2, Hash, S3),
-            case nkpacket_httpc:do_request(ConnPid, put, Path, Headers, FileBin, #{no_host_header=>true}) of
+            case
+                nkpacket_httpc:do_request(ConnPid, put, Path, Headers, FileBin, ConnOpts)
+            of
                 {ok, 200, Hds, _} ->
                     {ok, #{s3_headers=>Hds}};
                 {ok, 403, _, _} ->
@@ -104,22 +108,23 @@ upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBin) ->
 
 
 %% @private
-download(SrvId, PackageId, ProviderSpec, FileMeta) ->
+download(_SrvId, _PackageId, ProviderSpec, FileMeta) ->
     #{name:=Name} = FileMeta,
     Path1 = maps:get(path, FileMeta, <<"/">>),
     Path2 = filename:join(Path1, to_bin(Name)),
-    #{s3_Id:=Id, s3_Secret:=Secret, bucket:=Bucket} = ProviderSpec,
-    PoolId = {nkfile_s3, SrvId, PackageId},
-    case nkpacket_pool:get_conn_pid(PoolId) of
-        {ok, ConnPid, #{url:=Url}} ->
+    #{s3Key:=Key, s3Secret:=Secret, bucket:=Bucket} = ProviderSpec,
+    case get_connection(ProviderSpec) of
+        {ok, Url, ConnPid, ConnOpts} ->
             S3 = #{
-                key_id => Id,
-                key => Secret,
+                key => Key,
+                secret => Secret,
                 bucket => Bucket,
                 host => Url
             },
             {_Uri, Path, Headers} = nkpacket_httpc_s3:get_object(Bucket, Path2, S3),
-            case nkpacket_httpc:do_request(ConnPid, get, Path, Headers, <<>>, #{no_host_header=>true}) of
+            case
+                nkpacket_httpc:do_request(ConnPid, get, Path, Headers, <<>>, ConnOpts)
+            of
                 {ok, 200, Hds, Body} ->
                     {ok, Body, #{s3_headers=>Hds}};
                 {ok, 403, _, _} ->
@@ -136,36 +141,33 @@ download(SrvId, PackageId, ProviderSpec, FileMeta) ->
     end.
 
 
-%% @doc
-start(ProviderSpec, #{id:=PackageId}, SupPid, Service) ->
-    #{id:=SrvId} = Service,
-    PoolConfig = #{
-        targets => maps:get(targets, ProviderSpec),
-        debug => maps:get(debug, ProviderSpec, false),
-        resolve_interval => maps:get(resolveInterval, ProviderSpec, 0)
-    },
-    PoolId = {nkfile_s3, SrvId, PackageId},
-    Spec = #{
-        id => PackageId,
-        start => {nkpacket_httpc_pool, start_link, [PoolId, PoolConfig]}
-    },
-    case nkservice_packages_sup:update_child(SupPid, Spec, #{}) of
-        {ok, ChildPid} ->
-            nklib_proc:put(PoolId, undefined, ChildPid),
-            ?LLOG(debug, "started ~s (~p)", [PackageId, ChildPid]),
-            ok;
-        not_updated ->
-            ?LLOG(debug, "didn't upgrade ~s", [PackageId]),
-            ok;
-        {upgraded, ChildPid} ->
-            nklib_proc:put(PoolId, undefined, ChildPid),
-            ?LLOG(info, "upgraded ~s (~p)", [PackageId, ChildPid]),
-            ok;
-        {error, Error} ->
-            ?LLOG(notice, "start/update error ~s: ~p", [PackageId, Error]),
-            {error, Error}
-    end.
 
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+
+get_connection(ProviderSpec) ->
+    Opts = maps:get(connection_opts, ProviderSpec, #{}),
+    case Opts of
+        #{httpc_pool:=PoolId} ->
+            case nkpacket_pool:get_conn_pid(PoolId) of
+                {ok, ConnPid, #{url:=Url}} ->
+                    {ok, Url, ConnPid, Opts};
+                {error, Error} ->
+                    {error, Error}
+            end;
+        _ ->
+            #{url:=Url} = ProviderSpec,
+            case nkpacket_httpc:do_connect(Url, Opts) of
+                {ok, ConnPid} ->
+                    {ok, Url, ConnPid, Opts};
+                {error, Error} ->
+                    {error, Error}
+            end;
+        _ ->
+            {error, url_is_missing}
+    end.
 
 
 %% @private

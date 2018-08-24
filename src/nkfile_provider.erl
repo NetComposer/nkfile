@@ -83,8 +83,7 @@
     ok | {error, term()}.
 
 
-
--optional_callbacks([start/4, encode_body/5]).
+-optional_callbacks([start/4, encode_body/5, decode_body/5]).
 
 
 
