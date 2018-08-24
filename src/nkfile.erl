@@ -47,6 +47,7 @@
         name => binary(),
         contentType => binary(),
         path => binary(),
+        size => integer(),
         sha256 => binary(),
         password => binary()
     }.

@@ -143,12 +143,12 @@ encode_body(SrvId, PackageId, #{module:=Module}=ProviderSpec, FileMeta, File) ->
             Module:encode_body(SrvId, PackageId, ProviderSpec, FileMeta, File);
         false ->
             case nkfile_util:check_size(ProviderSpec, FileMeta, File) of
-                true ->
-                    case nkfile_util:set_hash(ProviderSpec, FileMeta, File) of
-                        {ok, FileMeta2} ->
-                            case nkfile_util:encrypt(ProviderSpec, FileMeta2, File) of
-                                {ok, FileMeta3, File3, Meta} ->
-                                    {ok, FileMeta3, File3, Meta};
+                {ok, FileMeta2} ->
+                    case nkfile_util:set_hash(ProviderSpec, FileMeta2, File) of
+                        {ok, FileMeta3} ->
+                            case nkfile_util:encrypt(ProviderSpec, FileMeta3, File) of
+                                {ok, FileMeta4, File4, Meta} ->
+                                    {ok, FileMeta4, File4, Meta};
                                 {error, Error} ->
                                     {error, Error}
                             end;

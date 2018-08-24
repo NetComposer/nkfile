@@ -61,9 +61,16 @@ parse_file_meta(Meta) ->
 
 
 %% @private
-check_size(ProviderSpec, _FileMeta, Bin) ->
+check_size(ProviderSpec, FileMeta, Bin) ->
     MaxSize = maps:get(maxSize, ProviderSpec, 0),
-    MaxSize==0 orelse byte_size(Bin) =< MaxSize.
+    ByteSize = byte_size(Bin),
+    case MaxSize==0 orelse byte_size(Bin) =< MaxSize of
+        true ->
+            {ok, FileMeta#{size=>ByteSize}};
+        false ->
+            {error, file_too_large}
+    end.
+
 
 
 %% @private
