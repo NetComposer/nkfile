@@ -23,7 +23,7 @@
 -module(nkfile).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([parse_file_meta/1, parse_provider_spec/3]).
+-export([parse_file_meta/3, parse_provider_spec/3]).
 -export([upload/5, download/4]).
 -export([luerl_upload/3, luerl_download/3]).
 
@@ -35,28 +35,44 @@
 %% Types
 %% ===================================================================
 
+%% @doc Provider specification
+-type provider_spec() ::
+    #{
+        id := binary(),
+        storageClass := binary(),
+        module := module(),
+        maxSize => pos_integer,
+        encryption => {atom, [aes_cfb128]},
+        hash => {atom, [sha256]},
+        debug => boolean,
+        atom() => term()
+    }.
+
 
 %% @doc A file body
 -type file_body() :: binary().
 
 
-%% @see A file metadata
+%% @doc A file metadata
 -type file_meta() ::
     #{
+        name := binary(),
+        contentType := binary(),
         id => binary(),
-        name => binary(),
-        contentType => binary(),
         path => binary(),
         size => integer(),
-        sha256 => binary(),
-        password => binary()
+        hash => binary(),           % Base64
+        password => binary()        % Base64
     }.
 
-%% @see result_meta/0 types in providers
--type result_meta() ::
-    #{
-        password => binary()
 
+
+
+-type op_meta() ::
+    #{
+        crypt_usecs => integer(),
+        s3_headers => list(),
+        file_path => binary()
     }.
 
 
@@ -67,40 +83,43 @@
 
 
 
-%% @doc Check for valid nkfile:file_meta()
--spec parse_file_meta(map()) ->
+%% @doc Check for valid file_meta()
+-spec parse_file_meta(nkservice:id(), nkservice:package_id(), map()) ->
     {ok, file_meta()} | {error, term()}.
 
-parse_file_meta(Meta) ->
-    nkfile_util:parse_file_meta(Meta).
+parse_file_meta(SrvId, PackageId, Meta) ->
+    case nkfile_util:parse_file_meta(Meta) of
+        {ok, Parsed} ->
+            ?CALL_SRV(SrvId, nkfile_parse_file_meta, [SrvId, PackageId, Parsed]);
+        {error, Error} ->
+            {error, Error}
+    end.
 
 
 %% @doc Checks that an user-defined provider spec is valid
 -spec parse_provider_spec(nkservice:id(), nkservice:package_id(), map()) ->
-    {ok, nkfile_provider:spec()} | {error, term()}.
+    {ok, provider_spec()} | {error, term()}.
 
-parse_provider_spec(SrvId, PackageId, #{storageClass:=Class}=Meta) ->
-    case catch nkfile_plugin:get_class_module(SrvId, PackageId, Class) of
-        {'EXIT', _} ->
-            {error, {storage_class_unknown, Class}};
-        Module ->
-            nkfile_provider:parse_spec(Module, Meta)
+parse_provider_spec(SrvId, PackageId, Spec) ->
+    case nkfile_util:parse_provider_spec(Spec) of
+        {ok, Parsed} ->
+            ?CALL_SRV(SrvId, nkfile_parse_provider_spec, [SrvId, PackageId, Parsed]);
+        {error, Error} ->
+            {error, Error}
     end.
 
 
 
 %% @doc Sends a file to the provider defined destination
-%% If the provider is defined in the package, use the second version
-%% If you have a provider defined elsewhere, use the first option, but use
-%% nkfile_provider:parse_spec/1
-%% Use parse_meta/1 to check file's meta
--spec upload(nkservice:id(), nkservice:package_id(), nkfile_provider:spec(), file_meta(), file_body()) ->
-    {ok, file_meta(), result_meta()} | {error, term()}.
+%% Use parse_file_meta/3 and parse_provider_spec/3
+-spec upload(nkservice:id(), nkservice:package_id(), provider_spec(),
+             file_meta(), file_body()) ->
+    {ok, file_meta(), op_meta()} | {error, term()}.
 
-upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) when is_map(ProviderSpec) ->
-    case nkfile_provider:encode_body(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) of
+upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) ->
+    case ?CALL_SRV(SrvId, nkfile_encode_body, [SrvId, PackageId, ProviderSpec, FileMeta, FileBody]) of
         {ok, FileMeta2, Bin, Meta1} ->
-            case nkfile_provider:upload(SrvId, PackageId, ProviderSpec, FileMeta2, Bin) of
+            case ?CALL_SRV(SrvId, nkfile_upload, [SrvId, PackageId, ProviderSpec, FileMeta2, Bin]) of
                 {ok, Meta2} ->
                     {ok, FileMeta2, maps:merge(Meta1, Meta2)};
                 {error, Error} ->
@@ -108,14 +127,6 @@ upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) when is_map(ProviderS
             end;
         {error, Error} ->
             {error, Error}
-    end;
-
-upload(SrvId, PackageId, ProviderId, FileMeta, FileBody) ->
-    case nkfile_provider:get_spec(SrvId, PackageId, ProviderId) of
-        undefined ->
-            {error, {provider_unknown, ProviderId}};
-        ProviderSpec when is_map(ProviderSpec) ->
-            upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody)
     end.
 
 
@@ -125,13 +136,13 @@ upload(SrvId, PackageId, ProviderId, FileMeta, FileBody) ->
 %% If you have a provider defined elsewhere, use the first option, but use
 %% nkfile_provider:parse_spec/1
 %% Use parse_meta/1 to check file's meta
--spec download(nkservice:id(), nkservice:package_id(), nkfile_provider:spec(), file_meta()) ->
-    {ok, binary(), result_meta()} | {error, term()}.
+-spec download(nkservice:id(), nkservice:package_id(), provider_spec(), file_meta()) ->
+    {ok, binary(), op_meta()} | {error, term()}.
 
-download(SrvId, PackageId, ProviderSpec, FileMeta) when is_map(ProviderSpec) ->
-    case nkfile_provider:download(SrvId, PackageId, ProviderSpec, FileMeta) of
+download(SrvId, PackageId, ProviderSpec, FileMeta) ->
+    case ?CALL_SRV(SrvId, nkfile_download, [SrvId, PackageId, ProviderSpec, FileMeta]) of
         {ok, File1, Meta1} ->
-            case nkfile_provider:decode_body(SrvId, PackageId, ProviderSpec, FileMeta, File1) of
+            case ?CALL_SRV(SrvId, nkfile_decode_body, [SrvId, PackageId, ProviderSpec, FileMeta, File1]) of
                 {ok, File2, Meta2} ->
                     {ok, File2, maps:merge(Meta1, Meta2)};
                 {error, Error} ->
@@ -139,15 +150,8 @@ download(SrvId, PackageId, ProviderSpec, FileMeta) when is_map(ProviderSpec) ->
             end;
         {error, Error} ->
             {error, Error}
-    end;
-
-download(SrvId, PackageId, ProviderId, FileMeta) ->
-    case nkfile_provider:get_spec(SrvId, PackageId, ProviderId) of
-        undefined ->
-            {error, {provider_unknown, ProviderId}};
-        ProviderSpec when is_map(ProviderSpec) ->
-            download(SrvId, PackageId, ProviderSpec, FileMeta)
     end.
+
 
 
 %% ===================================================================

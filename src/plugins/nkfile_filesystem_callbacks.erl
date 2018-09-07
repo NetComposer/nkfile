@@ -18,76 +18,67 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc NkFILE Filesystem provider
+%% @doc NkFILE Filesystem callbacks
 
--module(nkfile_filesystem_provider).
+-module(nkfile_filesystem_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
--behavior(nkfile_provider).
 
--export([config/0, parse_spec/1, upload/5, download/4]).
--export_type([result_meta/0]).
+-export([nkfile_parse_provider_spec/3, nkfile_upload/5, nkfile_download/4]).
 
 -include("nkfile.hrl").
--define(LLOG(Type, Txt, Args),lager:Type("NkFILE Filesystem "++Txt, Args)).
+-include_lib("nkservice/include/nkservice.hrl").
 
-
-
-%% ===================================================================
-%% Types
-%% ===================================================================
-
-
-%% @doc returned metadata
--type result_meta() ::
-    #{
-        file_path => binary()
-    }.
+-define(CLASS, <<"filesystem">>).
 
 
 %% ===================================================================
-%% Provider callbacks
+%% Callbacks
 %% ===================================================================
-
-%% @doc
-config() ->
-    #{
-        storageClass => <<"filesystem">>
-    }.
 
 
 %% @doc
-parse_spec(_Spec) ->
-    {syntax, #{
-        maxSize => pos_integer,
-        encryption => {atom, [aes_cfb128]},
-        hash => {atom, [sha256]},
-        debug => boolean,
-        filePath => binary,
-        '__mandatory' => [filePath],
-        '__allow_unknown' =>true
-    }}.
+nkfile_parse_provider_spec(SrvId, PackageId, #{storageClass:=?CLASS}=Spec) ->
+    Syntax = #{
+        filesystemConfig => #{
+            filePath => binary,
+            '__mandatory' => [filePath]
+        },
+        '__mandatory' => [filesystemConfig],
+        '__allow_unknown' => true
+    },
+    case nklib_syntax:parse(Spec, Syntax) of
+        {ok, Parsed, _} ->
+            {continue, [SrvId, PackageId, Parsed]};
+        {error, Error} ->
+            {error, Error}
+    end;
+
+nkfile_parse_provider_spec(_SrvId, _PackageId, _Spec) ->
+    continue.
 
 
-
-%% @private
-upload(_SrvId, _PackageId, ProviderSpec, FileMeta, FileBin) ->
+%% @doc
+nkfile_upload(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta, Bin) ->
     #{name:=Name} = FileMeta,
-    #{filePath:=ProviderPath} = ProviderSpec,
+    #{filesystemConfig:=#{filePath:=ProviderPath}} = ProviderSpec,
     FilePath = maps:get(path, FileMeta, <<>>),
     WritePath = filename:join([ProviderPath, FilePath, Name]),
-    case file:write_file(WritePath, FileBin) of
+    case file:write_file(WritePath, Bin) of
         ok ->
             {ok, #{file_path=>WritePath}};
         {error, Error} ->
             lager:warning("write error at ~s: ~p", [WritePath, Error]),
             {error, file_write_error}
-    end.
+    end;
+
+nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
+    continue.
 
 
-%% @private
-download(_SrvId, _PackageId, ProviderSpec, FileMeta) ->
+%% @doc
+nkfile_download(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
     #{name:=Name} = FileMeta,
-    #{filePath:=ProviderPath} = ProviderSpec,
+    #{filesystemConfig:=#{filePath:=ProviderPath}} = ProviderSpec,
     FilePath = maps:get(path, FileMeta, <<>>),
     ReadPath = filename:join([ProviderPath, FilePath, Name]),
     case file:read_file(ReadPath) of
@@ -96,4 +87,7 @@ download(_SrvId, _PackageId, ProviderSpec, FileMeta) ->
         {error, Error} ->
             lager:warning("read error at ~s: ~p", [ReadPath, Error]),
             {error, file_read_error}
-    end.
+    end;
+
+nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    continue.

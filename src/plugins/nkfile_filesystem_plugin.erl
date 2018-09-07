@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc NkFILE callbacks
+%% @doc NkFILE filesystem plugin
 
 -module(nkfile_filesystem_plugin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0, plugin_config/3]).
+-export([plugin_deps/0]).
 
 -include("nkfile.hrl").
 
@@ -44,14 +44,4 @@
 
 plugin_deps() ->
     [nkfile].
-
-
-%% @doc
-plugin_config(?PACKAGE_CLASS_FILE, #{id:=_Id, config:=Config}=Spec, _Service) ->
-    Modules1 = maps:get(fileProviderModules, Config, []),
-    Modules2 = [nkfile_filesystem_provider|Modules1],
-    {ok, Spec#{config=>Config#{fileProviderModules=>Modules2}}};
-
-plugin_config(_Class, _Package, _Service) ->
-    continue.
 

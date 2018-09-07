@@ -24,7 +24,8 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([msg/1]).
--export([nkfile_parse_meta/4, nkfile_upload/4, nkfile_download/3]).
+-export([nkfile_parse_file_meta/3, nkfile_parse_provider_spec/3]).
+-export([nkfile_encode_body/5, nkfile_decode_body/5, nkfile_upload/5, nkfile_download/4]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -35,7 +36,7 @@
 %% Types
 %% ===================================================================
 
-% -type continue() :: continue | {continue, list()}.
+-type continue() :: continue | {continue, list()}.
 
 
 
@@ -56,46 +57,65 @@ msg({encryption_algo_unknown, Algo})  -> {"Unknown encryption algorithm: '~s'", 
 msg(_)                                -> continue.
 
 
-
 %% ===================================================================
-%% Mail callbacks
+%% Callbacks
 %% ===================================================================
 
 
-%% @doc
--spec nkfile_parse_meta(nkservice:id(), nkservice:package_id(), binary(), nkfile:meta()) ->
-    {ok, nkfile:meta()} | {error, term()}.
+%% @doc Check for valid nkfile:file_meta()
+-spec nkfile_parse_file_meta(nkservice:id(), nkservice:package_id(), map()) ->
+    {ok, nkfile:file_meta()} | {error, term()} | continue().
 
-nkfile_parse_meta(_SrvId, _PackageId, _Class, Meta) ->
-    % Fields used by most plugins
-    Syntax = #{
-        id => binary,
-        name => binary,
-        password => binary,
-        contentType => binary,
-        path => binary,
-        '__allow_unknown' => true
-    },
-    case nklib_syntax:parse(Meta, Syntax) of
-        {ok, Parsed, _} ->
-            {ok, Parsed};
-        {error, Error} ->
-            {error, Error}
-    end.
+nkfile_parse_file_meta(_SrvId, _PackageId, Meta) ->
+    {ok, Meta}.
 
 
-%% @doc Stores the file
--spec nkfile_upload(nkservice:id(), nkservice:package_id(), binary(), nkfile:meta()) ->
-    {ok, nkfile:file()} | {error, term()}.
+%% @doc Checks that an user-defined provider spec is valid
+-spec nkfile_parse_provider_spec(nkservice:id(), nkservice:package_id(), map()) ->
+    {ok, nkfile:provider_spec()} | {error, term()}.
 
-nkfile_upload(_SrvId, _PackageId, _Body, _Meta) ->
-    {error, invalid_store}.
+nkfile_parse_provider_spec(_SrvId, _PackageId, Spec) ->
+    {ok, Spec}.
 
 
-%% @doc Retrieves the file
--spec nkfile_download(nkservice:id(), nkservice:package_id(), nkfile:meta()) ->
-    {ok, nkfile:file(), binary()} | {error, term()}.
+%% @doc Perform processing and encoding
+%% - size calculation
+%% - hash calculation
+%% - encryption
+-spec nkfile_encode_body(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+                         nkfile:file_meta(), nkfile:file_body()) ->
+    {ok, nkfile:file_meta(), binary(), nkfile:op_meta()} | {error, term()} | continue().
 
-nkfile_download(_SrvId, _PackageId, _Meta) ->
-    {error, invalid_store}.
+nkfile_encode_body(_SrvId, _PackageId, ProviderSpec, FileMeta, File) ->
+    nkfile_util:encode_body(ProviderSpec, FileMeta, File).
+
+
+%% @doc Perform processing and decoding
+%% - hash check
+%% - un-encryption
+-spec nkfile_decode_body(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    nkfile:file_meta(), binary()) ->
+    {ok, binary(), map()} | {error, term()} | continue().
+
+nkfile_decode_body(_SrvId, _PackageId, ProviderSpec, FileMeta, File) ->
+    nkfile_util:decode_body(ProviderSpec, FileMeta, File).
+
+
+
+%% @doc Perform real upload
+-spec nkfile_upload(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    nkfile:file_meta(), binary()) ->
+    {ok, map()} | {error, term()} | continue().
+
+nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
+    {error, storage_class_unknown}.
+
+
+%% @doc Perform real download
+-spec nkfile_download(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    nkfile:file_meta()) ->
+    {ok, binary(), map()} | {error, term()} | continue().
+
+nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    {error, storage_class_unknown}.
 

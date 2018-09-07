@@ -23,7 +23,7 @@
 -module(nkfile_util).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([parse_file_meta/1, check_size/3, set_hash/3, encrypt/3, decrypt/3, check_hash/3]).
+-export([parse_provider_spec/1, parse_file_meta/1, encode_body/3, decode_body/3]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -41,14 +41,38 @@
 %% Public
 %% ===================================================================
 
+
+%% @doc
+parse_provider_spec(Map) ->
+    Syntax = #{
+        id => binary,
+        storageClass => binary,
+        module => module,
+        maxSize => pos_integer,
+        encryption => {atom, [aes_cfb128]},
+        hash => {atom, [sha256]},
+        debug => boolean,
+        '__mandatory' => [storageClass],
+        '__allow_unknown' =>true
+    },
+    case nklib_syntax:parse(Map, Syntax) of
+        {ok, Parsed, _} ->
+            {ok, Parsed};
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
 %% @doc Check for valid nkfile:file_meta()
 parse_file_meta(Meta) ->
     Syntax = #{
+        id => binary,
         name => binary,
         contentType => binary,
-        id => binary,
+        hash => binary,
         password => binary,
         path => binary,
+        size => pos_integer,
         '__mandatory' => [name, contentType],
         '__allow_unknown' => true
     },
@@ -60,7 +84,51 @@ parse_file_meta(Meta) ->
     end.
 
 
-%% @private
+%% @doc
+encode_body(ProviderSpec, FileMeta, File) ->
+    % Adds 'size' parameter
+    case check_size(ProviderSpec, FileMeta, File) of
+        {ok, FileMeta2} ->
+            % Adds 'hash' parameter
+            case set_hash(ProviderSpec, FileMeta2, File) of
+                {ok, FileMeta3} ->
+                    % Adds 'password' parameter (if not specified before)
+                    case encrypt(ProviderSpec, FileMeta3, File) of
+                        {ok, FileMeta4, File4, Meta} ->
+                            {ok, FileMeta4, File4, Meta};
+                        {error, Error} ->
+                            {error, Error}
+                    end;
+                {error, Error} ->
+                    {error, Error}
+            end;
+        false ->
+            {error, file_too_large}
+    end.
+
+
+%% @doc
+decode_body(ProviderSpec, FileMeta, File) ->
+    case decrypt(ProviderSpec, FileMeta, File) of
+        {ok, File2, Meta} ->
+            case check_hash(ProviderSpec, FileMeta, File2) of
+                ok ->
+                    {ok, File2, Meta};
+                {error, Error} ->
+                    {error, Error}
+            end;
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+
+%% ===================================================================
+%% Internal
+%% ===================================================================
+
+
+%% @private Check size and adds 'size' param
 check_size(ProviderSpec, FileMeta, Bin) ->
     MaxSize = maps:get(maxSize, ProviderSpec, 0),
     ByteSize = byte_size(Bin),
@@ -73,7 +141,7 @@ check_size(ProviderSpec, FileMeta, Bin) ->
 
 
 
-%% @private
+%% @private Check hash and adds 'hash' param
 set_hash(ProviderSpec, FileMeta, Bin) ->
     case maps:find(hash, ProviderSpec) of
         {ok, sha256} ->

@@ -37,58 +37,7 @@ start() ->
         packages => [
             #{
                 id => file_pkg,
-                class => 'File',
-                config => #{
-                    fileProviders => [
-                        #{
-                            id => file1,
-                            storageClass => filesystem,
-                            filePath => "/tmp",
-                            debug => true
-                        },
-                        #{
-                            id => file2,
-                            storageClass => filesystem,
-                            filePath => "/tmp",
-                            encryption => aes_cfb128
-                        },
-                        #{
-                            id => s3,
-                            storageClass => s3,
-                            url => "http://localhost:9000",
-                            s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
-                            s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-                            bucket => bucket1,
-                            encryption => aes_cfb128,
-                            debug => true
-                        }
-                    ]
-                }
-            },
-            #{
-                id => pool1,
-                class => 'HttpPool',
-                config => #{
-                    targets => [
-                        #{
-                            url => "http://localhost:9000",
-                            weight => 1,
-                            pool => 2
-                        },
-                        #{
-                            url => "http://192.168.0.9:9000",
-                            weight => 2,
-                            pool => 2
-                        }
-                        %%  #{
-                        %%     url => "https://s3-eu-west-1.amazonaws.com",
-                        %%    pool => 2,
-                        %%   opts => #{tls_verify=>host, debug=>false}
-                        %% }
-                    ],
-                    resolveIntervalSecs => 15000,
-                    debug => true
-                }
+                class => 'File'
             }
         ]
 %%        modules => [
@@ -138,95 +87,68 @@ s1() -> <<"
 ">>.
 
 
-
-% Test filesystem with in-package config
-test_filesystem_1() ->
-    FileMeta = #{name=>n1, contentType=>any},
-    {ok, _, #{file_path:=<<"/tmp/n1">>}} = nkfile:upload(?SRV, file_pkg, file1, FileMeta, <<"123">>),
-    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, file1, FileMeta),
-
-    {ok, #{password:=Pass}, #{crypt_usecs:=_}} = nkfile:upload(?SRV, file_pkg, file2, FileMeta, <<"321">>),
-    {error, password_missing} = nkfile:download(?SRV, file_pkg, file2, FileMeta),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, file2, FileMeta#{password=>Pass}),
-    ok.
-
-
-
 % Test filesystem with external config
-test_filesystem_2() ->
+test_filesystem() ->
     BaseProvider1 = #{
         id => test_fs_2a,
         storageClass => filesystem,
         hash => sha256,
-        filePath => "/tmp"
+        filesystemConfig => #{
+            filePath => "/tmp"
+        }
     },
     {ok, Provider1} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider1),
     FileMeta = #{name=>n1, contentType=>any},
     SHA1 = base64:encode(crypto:hash(sha256, <<"123">>)),
     {ok, #{hash:=SHA1}, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, Provider1, FileMeta, <<"123">>),
     {error,hash_is_missing} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
+    {ok, <<"123">>} = file:read_file("/tmp/n1"),
     {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta#{hash=>SHA1}),
 
     BaseProvider2 = #{
         id => test_fs_2b,
         storageClass => filesystem,
         hash => sha256,
-        filePath => "/tmp",
-        encryption => aes_cfb128
+        encryption => aes_cfb128,
+        filesystemConfig => #{
+            filePath => "/tmp"
+        }
     },
     {ok, Provider2} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider2),
     SHA2 = base64:encode(crypto:hash(sha256, <<"321">>)),
-    {ok, #{password:=Pass, hash:=SHA2}, #{crypt_usecs:=_}} =
-        nkfile:upload(?SRV, file_pkg, Provider2, FileMeta, <<"321">>),
+    {ok, #{password:=Pass, hash:=SHA2}, #{crypt_usecs:=_}} = nkfile:upload(?SRV, file_pkg, Provider2, FileMeta, <<"321">>),
+
     {error, password_missing} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta),
     {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
+    {ok, Enc} = file:read_file("/tmp/n1"),
+    true = Enc /= <<"321">>,
 
-    ok = file:write_file("/tmp/n1", <<"abc">>),
+        ok = file:write_file("/tmp/n1", <<"abc">>),
     {error, hash_invalid} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
     ok.
 
 
-% Test s3 with in-package config
-test_s3_1() ->
-    FileMeta3 = #{name=>n3, contentType=>any},
-    {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, file_pkg, s3, FileMeta3, <<"321">>),
-    {ok, <<"321">>, _, _} = nkfile:download(?SRV, file_pkg, s3, FileMeta3#{password=>Pass}).
-
 
 % Test s3 with external config
-test_s3_2() ->
+test_s3() ->
     BaseProvider = #{
         id => test_s3_2a,
         storageClass => s3,
-        url => "http://localhost:9000",
-        s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
-        s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-        bucket => bucket1,
-        encryption => aes_cfb128,
-        debug => true
-    },
-    {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
-    FileMeta = #{name=>n3, contentType=>any},
-    {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
-    {ok, <<"321">>, _, _} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}).
-
-
-% Test s3 with external config & pool
-test_s3_3() ->
-    BaseProvider = #{
-        id => test_s3_2a,
-        storageClass => s3,
-        url => "http://localhost:9000",
-        s3Key => "5UBED0Q9FB7MFZ5EWIOJ",
-        s3Secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
-        bucket => bucket1,
         encryption => aes_cfb128,
         debug => true,
-        connection_opts => #{
-            httpc_pool => <<"file_test-pool1">>
+        s3Config => #{
+            scheme => http,
+            host => localhost,
+            port => 9000,
+            bucket => bucket1,
+            key => "5UBED0Q9FB7MFZ5EWIOJ",
+            secret => "CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI",
+            hackney_pool => pool1
         }
     },
     {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
     FileMeta = #{name=>n3, contentType=>any},
     {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
-    {ok, <<"321">>, _, _} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}).
+    {ok, <<"321">>, #{s3_headers:=_}} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}),
+    ok.
+
