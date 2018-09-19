@@ -42,6 +42,7 @@
 plugin_deps() ->
 	[].
 
+
 %% @doc
 plugin_api(?PACKAGE_CLASS_FILE) ->
 	#{

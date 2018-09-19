@@ -24,7 +24,8 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([parse_file_meta/3, parse_provider_spec/3]).
--export([upload/5, download/4]).
+-export([upload/5, download/4, make_download_link/4, make_upload_link/4, delete/4]).
+-export([check_file_meta/4]).
 -export([luerl_upload/3, luerl_download/3]).
 
 -include("nkfile.hrl").
@@ -40,10 +41,9 @@
     #{
         id := binary(),
         storageClass := binary(),
-        module := module(),
         maxSize => pos_integer,
-        encryption => {atom, [aes_cfb128]},
-        hash => {atom, [sha256]},
+        encryptionAlgo => {atom, [aes_cfb128]},
+        hashAlgo => {atom, [sha256]},
         debug => boolean,
         atom() => term()
     }.
@@ -59,7 +59,6 @@
         name := binary(),
         contentType := binary(),
         id => binary(),
-        path => binary(),
         size => integer(),
         hash => binary(),           % Base64
         password => binary()        % Base64
@@ -152,6 +151,40 @@ download(SrvId, PackageId, ProviderSpec, FileMeta) ->
             {error, Error}
     end.
 
+
+
+%% @doc For compatible storage's, generate an temporary upload link.
+%% It will fail if encryption or hash is used
+-spec make_upload_link(nkservice:id(), nkservice:package_id(), provider_spec(), file_meta()) ->
+    {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()}.
+
+make_upload_link(SrvId, PackageId, ProviderSpec, FileMeta) ->
+    ?CALL_SRV(SrvId, nkfile_make_upload_link, [SrvId, PackageId, ProviderSpec, FileMeta]).
+
+
+%% @doc For compatible storage's, generate an temporary download link.
+%% It will fail if encryption or hash is used
+-spec make_download_link(nkservice:id(), nkservice:package_id(), provider_spec(), file_meta()) ->
+    {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()}.
+
+make_download_link(SrvId, PackageId, ProviderSpec, FileMeta) ->
+    ?CALL_SRV(SrvId, nkfile_make_download_link, [SrvId, PackageId, ProviderSpec, FileMeta]).
+
+
+%% @doc For compatible storage's, gets as much metadata as possible
+-spec check_file_meta(nkservice:id(), nkservice:package_id(), provider_spec(), binary()) ->
+    {ok, file_meta()}.
+
+check_file_meta(SrvId, PackageId, ProviderSpec, FileId) ->
+    ?CALL_SRV(SrvId, nkfile_check_file_meta, [SrvId, PackageId, ProviderSpec, FileId]).
+
+
+%% @doc Deletes a file
+-spec delete(nkservice:id(), nkservice:package_id(), provider_spec(), file_meta()) ->
+    ok | {error, term()}.
+
+delete(SrvId, PackageId, ProviderSpec, FileMeta) ->
+    ?CALL_SRV(SrvId, nkfile_delete, [SrvId, PackageId, ProviderSpec, FileMeta]).
 
 
 %% ===================================================================

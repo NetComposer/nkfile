@@ -26,6 +26,9 @@
 -export([msg/1]).
 -export([nkfile_parse_file_meta/3, nkfile_parse_provider_spec/3]).
 -export([nkfile_encode_body/5, nkfile_decode_body/5, nkfile_upload/5, nkfile_download/4]).
+-export([nkfile_make_upload_link/4, nkfile_make_download_link/4]).
+-export([nkfile_check_file_meta/4, nkfile_delete/4]).
+
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -45,14 +48,12 @@
 %% ===================================================================
 
 %% @doc
-msg(base64_decode_error)              -> "BASE64 decode error";
 msg(decryption_error)                 -> "Decryption error";
 msg(encryption_error)                 -> "Encryption error";
 msg(file_read_error)                  -> "File read error";
 msg(file_write_error)                 -> "File write error";
-msg(invalid_file_body)                -> "Invalid file body";
-msg(invalid_store)                    -> "Invalid store";
-msg({store_not_found, Id})            -> {"Store not found: ~p", [Id]};
+msg(storage_class_invalid)            -> "Storage class invalid";
+msg(storage_class_unknown)            -> "Storage class unknown";
 msg({encryption_algo_unknown, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
 msg(_)                                -> continue.
 
@@ -119,3 +120,38 @@ nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
 nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
     {error, storage_class_unknown}.
 
+
+%% @doc For compatible storage's, generates a temporary upload link
+-spec nkfile_make_upload_link(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    nkfile:file_meta()) ->
+    {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()} | continue().
+
+nkfile_make_upload_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    {error, storage_class_invalid}.
+
+
+%% @doc For compatible storage's, generates a temporary download link
+-spec nkfile_make_download_link(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    nkfile:file_meta()) ->
+    {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()} | continue().
+
+nkfile_make_download_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    {error, storage_class_invalid}.
+
+
+%% @doc
+-spec nkfile_check_file_meta(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
+    binary()) ->
+    {ok, nkfile:file_meta()} | {error, term()} | continue().
+
+nkfile_check_file_meta(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    {error, storage_class_invalid}.
+
+
+%% @doc Deletes a file
+-spec nkfile_delete(nkservice:id(), nkservice:package_id(),
+                    nkfile:provider_spec(), nkfile:file_meta()) ->
+    ok | {error, term()} | continue.
+
+nkfile_delete(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    {error, storage_class_invalid}.

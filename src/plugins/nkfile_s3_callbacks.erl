@@ -23,12 +23,17 @@
 -module(nkfile_s3_callbacks).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([nkfile_parse_provider_spec/3, nkfile_upload/5, nkfile_download/4]).
+-export([nkfile_parse_provider_spec/3, nkfile_upload/5, nkfile_download/4, nkfile_delete/4]).
+-export([nkfile_make_upload_link/4, nkfile_make_download_link/4]).
+-export([nkfile_check_file_meta/4]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
 
 -define(CLASS, <<"s3">>).
+
+-define(UPLOAD_LINK_TTL_SECS, 5*60).
+-define(DOWNLOAD_LINK_TTL_SECS, 5*60).
 
 
 %% ===================================================================
@@ -56,6 +61,8 @@ nkfile_parse_provider_spec(SrvId, PackageId, #{storageClass:=?CLASS}=Spec) ->
             scheme => {atom, [http, https]},
             host => binary,
             port => pos_integer,
+            uploadLinkTTLSecs => pos_integer,
+            downloadLinkTTLSecs => pos_integer,
             hackney_pool => binary,
             '__mandatory' => [key, secret, bucket]
         },
@@ -75,12 +82,10 @@ nkfile_parse_provider_spec(_SrvId, _PackageId, _Spec) ->
 
 %% @doc
 nkfile_upload(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta, Bin) ->
-    #{name:=Name, contentType:=CT} = FileMeta,
-    #{s3Config:=#{bucket:=Bucket}=Config} = ProviderSpec,
-    Path1 = maps:get(path, FileMeta, <<"/">>),
-    Path2 = filename:join(Path1, to_bin(Name)),
+    {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
+    CT = maps:get(contentType, FileMeta),
     Hash = crypto:hash(sha256, Bin),
-    {Method, Url, Hds} = nkpacket_httpc_s3:put_object(Bucket, Path2, CT, Hash, Config),
+    {Method, Url, Hds} = nkpacket_httpc_s3:put_object(Bucket, Path, CT, Hash, Config),
     case request(Method, Url, Hds, Bin, ProviderSpec) of
         {ok, _Body, Meta} ->
             {ok, Meta};
@@ -94,16 +99,86 @@ nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
 
 %% @doc
 nkfile_download(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
-    #{name:=Name} = FileMeta,
-    #{s3Config:=#{bucket:=Bucket}=Config} = ProviderSpec,
-    Path1 = maps:get(path, FileMeta, <<"/">>),
-    Path2 = filename:join(Path1, to_bin(Name)),
-    {Method, Url, Hds} = nkpacket_httpc_s3:get_object(Bucket, Path2, Config),
+    {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
+    {Method, Url, Hds} = nkpacket_httpc_s3:get_object(Bucket, Path, Config),
     request(Method, Url, Hds, <<>>, ProviderSpec);
 
 nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
     continue.
 
+
+%% @doc
+nkfile_make_upload_link(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
+    case
+        maps:is_key(encryptionAlgo, ProviderSpec) orelse
+        maps:is_key(hashAlgo, ProviderSpec)
+    of
+        true ->
+            {error, storage_class_invalid};
+        false ->
+            {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
+            CT = maps:get(contentType, FileMeta),
+            TTL = maps:get(uploadLinkTTLSecs, Config, ?UPLOAD_LINK_TTL_SECS),
+            {Verb, Uri} = nkpacket_httpc_s3:make_put_url(Bucket, Path, CT, TTL, Config),
+            {ok, Verb, Uri, TTL}
+    end;
+
+nkfile_make_upload_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    continue.
+
+
+%% @doc
+nkfile_make_download_link(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
+    case
+        maps:is_key(encryptionAlgo, ProviderSpec) orelse
+            maps:is_key(hashAlgo, ProviderSpec)
+    of
+        true ->
+            {error, storage_class_invalid};
+        false ->
+            {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
+            TTL = maps:get(downloadLinkTTLSecs, Config, ?DOWNLOAD_LINK_TTL_SECS),
+            {Verb, Uri} = nkpacket_httpc_s3:make_get_url(Bucket, Path, TTL, Config),
+            {ok, Verb, Uri, TTL}
+    end;
+
+nkfile_make_download_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    continue.
+
+
+%% @doc
+nkfile_check_file_meta(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, Id) ->
+    {Bucket, Path, Config} = get_config(ProviderSpec, #{name=>Id}),
+    {<<"HEAD">>, Url, Hds} = nkpacket_httpc_s3:get_meta(Bucket, Path, Config),
+    case request(<<"HEAD">>, Url, Hds, <<>>, ProviderSpec) of
+        {ok, _, #{s3_headers:=Headers}} ->
+            Headers2 = [{nklib_util:to_lower(Key), Val} || {Key, Val} <- Headers],
+            ContentType = nklib_util:get_value(<<"content-type">>, Headers2, <<>>),
+            Size = binary_to_integer(nklib_util:get_value(<<"content-length">>, Headers2, <<>>)),
+            case ProviderSpec of
+                #{maxSize:=MaxSize} when Size > MaxSize ->
+                    {error, file_too_large};
+                _ ->
+                    {ok, #{contentType=>ContentType, size=>Size}}
+            end;
+        {error, Error} ->
+            {error, Error}
+    end.
+
+
+%% @doc
+nkfile_delete(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
+    {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
+    {Method, Url, Hds} = nkpacket_httpc_s3:delete(Bucket, Path, Config),
+    case request(Method, Url, Hds, <<>>, ProviderSpec) of
+        {ok, _, _} ->
+            ok;
+        {error, Error} ->
+            {error, Error}
+    end;
+
+nkfile_delete(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+    continue.
 
 
 %% ===================================================================
@@ -111,17 +186,39 @@ nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
 %% ===================================================================
 
 
+%% @private
+get_config(ProviderSpec , FileMeta) ->
+    #{name:=Name} = FileMeta,
+    #{s3Config:=#{bucket:=Bucket}=Config} = ProviderSpec,
+    Path1 = maps:get(path, Config, <<"/">>),
+    Path2 = filename:join([<<"/">>, Path1, to_bin(Name)]),
+    {Bucket, Path2, Config}.
+
+
+%% @private
 request(Method, Url, Hds, Bin, ProviderSpec) ->
     PoolId = maps:get(hackney_pool, ProviderSpec, default),
     case hackney:request(Method, Url, Hds, Bin, [{pool, PoolId}, with_body]) of
+        {ok, 200, ReplyHds} ->
+            {ok, <<>>, #{s3_headers=>ReplyHds}};
         {ok, 200, ReplyHds, Body} ->
             {ok, Body, #{s3_headers=>ReplyHds}};
+        {ok, 204, ReplyHds} ->
+            {ok,<<>>, #{s3_headers=>ReplyHds}};
+        {ok, 204, ReplyHds, _} ->
+            {ok,<<>>, #{s3_headers=>ReplyHds}};
         {ok, 403, _, _} ->
+            {error, unauthorized};
+        {ok, 403, _} ->
             {error, unauthorized};
         {ok, 404, _, _} ->
             {error, file_not_found};
+        {ok, 404, _} ->
+            {error, file_not_found};
         {ok, Code, Hds, Body} ->
             {error, {http_error, Code, Hds, Body}};
+        {ok, Code, Hds} ->
+            {error, {http_error, Code, Hds, <<>>}};
         {error, Error} ->
             {error, Error}
     end.

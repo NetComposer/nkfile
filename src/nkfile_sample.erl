@@ -51,10 +51,8 @@ start() ->
     },
     nkservice:start(?SRV, Spec).
 
-%% Export MINIO
-%% export MINIO_ACCESS_KEY=5UBED0Q9FB7MFZ5EWIOJ
-%% export MINIO_SECRET_KEY=CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI
-%% minio server http://127.0.0.1:9000/tmp
+% export MINIO_ACCESS_KEY=5UBED0Q9FB7MFZ5EWIOJ; export MINIO_SECRET_KEY=CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI; minio server .
+
 
 
 %% @doc Stops the service
@@ -92,7 +90,7 @@ test_filesystem() ->
     BaseProvider1 = #{
         id => test_fs_2a,
         storageClass => filesystem,
-        hash => sha256,
+        hashAlgo => sha256,
         filesystemConfig => #{
             filePath => "/tmp"
         }
@@ -101,15 +99,15 @@ test_filesystem() ->
     FileMeta = #{name=>n1, contentType=>any},
     SHA1 = base64:encode(crypto:hash(sha256, <<"123">>)),
     {ok, #{hash:=SHA1}, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, Provider1, FileMeta, <<"123">>),
-    {error,hash_is_missing} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
+    {error, hash_is_missing} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
     {ok, <<"123">>} = file:read_file("/tmp/n1"),
     {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta#{hash=>SHA1}),
 
     BaseProvider2 = #{
         id => test_fs_2b,
         storageClass => filesystem,
-        hash => sha256,
-        encryption => aes_cfb128,
+        hashAlgo => sha256,
+        encryptionAlgo => aes_cfb128,
         filesystemConfig => #{
             filePath => "/tmp"
         }
@@ -134,7 +132,7 @@ test_s3() ->
     BaseProvider = #{
         id => test_s3_2a,
         storageClass => s3,
-        encryption => aes_cfb128,
+        encryptionAlgo => aes_cfb128,
         debug => true,
         s3Config => #{
             scheme => http,

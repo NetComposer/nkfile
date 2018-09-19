@@ -25,7 +25,6 @@
 -behaviour(application).
 
 -export([start/0, start/2, stop/1]).
--export([get_store_ids/0, get_store/1, put_store/2]).
 -export([get/1, get/2, put/2, del/1]).
 
 -include("nkfile.hrl").
@@ -68,24 +67,6 @@ start(_Type, _Args) ->
 %% @private OTP standard stop callback
 stop(_) ->
     ok.
-
-
-%% @doc
-get_store_ids() ->
-    get(store_ids, []).
-
-
-%% @doc
-get_store(Id) ->
-    get({store, nklib_util:to_binary(Id)}, not_found).
-
-
-%% @doc
-put_store(Id, Store) ->
-    Ids = get(store_ids, []),
-    put(store_ids, nklib_util:store_value(nklib_util:to_binary(Id), Ids)),
-    put({store, Id}, Store).
-
 
 
 %% Configuration access
