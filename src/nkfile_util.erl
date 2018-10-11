@@ -24,6 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([parse_provider_spec/1, parse_file_meta/1, encode_body/3, decode_body/3]).
+-export([get_url/2]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
@@ -121,6 +122,35 @@ decode_body(ProviderSpec, FileMeta, File) ->
             {error, Error}
     end.
 
+
+%% @doc
+-spec get_url(nkfile:provider_spec(), binary()) ->
+    {ok, CT::binary(), Body::binary()} | {error, term()}.
+
+get_url(ProviderSpec, Url) ->
+    MaxSize = maps:get(maxSize, ProviderSpec, 0),
+    case catch hackney:request(get, Url, [], <<>>, [{pool, default}]) of
+        {ok, 200, Hds, Ref} ->
+            case hackney_headers:parse(<<"content-length">>, Hds) of
+                Size when is_integer(Size) andalso (MaxSize==0 orelse Size =< MaxSize) ->
+                    case hackney_headers:parse(<<"content-type">>, Hds) of
+                        {T1, T2, _} ->
+                            case hackney:body(Ref) of
+                                {ok, Body} ->
+                                    CT = <<T1/binary, $/, T2/binary>>,
+                                    {ok, CT, Body};
+                                {error, Error} ->
+                                    {error, {hackney_error, Error}}
+                            end;
+                        _ ->
+                            {error, file_read_error}
+                    end;
+                _ ->
+                    {error, file_too_large}
+            end;
+        _ ->
+            {error, file_read_error}
+    end.
 
 
 %% ===================================================================

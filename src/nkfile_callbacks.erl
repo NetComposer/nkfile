@@ -51,6 +51,7 @@
 msg(decryption_error)                 -> "Decryption error";
 msg(encryption_error)                 -> "Encryption error";
 msg(file_read_error)                  -> "File read error";
+msg(file_too_large)                   -> "File is too large";
 msg(file_write_error)                 -> "File write error";
 msg(storage_class_invalid)            -> "Storage class invalid";
 msg(storage_class_unknown)            -> "Storage class unknown";

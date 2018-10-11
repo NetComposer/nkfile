@@ -129,7 +129,6 @@ upload(SrvId, PackageId, ProviderSpec, FileMeta, FileBody) ->
     end.
 
 
-
 %% @doc Sends a file to the provider defined destination
 %% If the provider is defined in the package, use the second version
 %% If you have a provider defined elsewhere, use the first option, but use
