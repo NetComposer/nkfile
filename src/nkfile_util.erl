@@ -24,10 +24,11 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([parse_provider_spec/1, parse_file_meta/1, encode_body/3, decode_body/3]).
--export([get_url/2]).
+-export([get_url/3]).
 
 -include("nkfile.hrl").
 -include_lib("nkservice/include/nkservice.hrl").
+-include_lib("nkservice/include/nkservice_actor.hrl").
 
 -define(IV, <<"NetComposerFile.">>).
 
@@ -52,6 +53,10 @@ parse_provider_spec(Map) ->
         maxSize => pos_integer,
         encryptionAlgo => {atom, [aes_cfb128]},
         hashAlgo => {atom, [sha256]},
+        directDownload => boolean,
+        directUpload => boolean,
+        directDownloadSecs => pos_integer,
+        directUploadSecs => pos_integer,
         debug => boolean,
         '__mandatory' => [storageClass],
         '__allow_unknown' =>true
@@ -124,12 +129,17 @@ decode_body(ProviderSpec, FileMeta, File) ->
 
 
 %% @doc
--spec get_url(nkfile:provider_spec(), binary()) ->
+-spec get_url(#actor_id{}, nkfile:provider_spec(), binary()) ->
     {ok, CT::binary(), Body::binary()} | {error, term()}.
 
-get_url(ProviderSpec, Url) ->
+get_url(ProvActorId, ProviderSpec, Url) ->
+    #actor_id{domain=Domain} = ProvActorId,
     MaxSize = maps:get(maxSize, ProviderSpec, 0),
-    case catch hackney:request(get, Url, [], <<>>, [{pool, default}]) of
+    Opts = [
+        follow_redirect,
+        {pool, Domain}
+    ],
+    case catch hackney:request(get, Url, [], <<>>, Opts) of
         {ok, 200, Hds, Ref} ->
             case hackney_headers:parse(<<"content-length">>, Hds) of
                 Size when is_integer(Size) andalso (MaxSize==0 orelse Size =< MaxSize) ->

@@ -44,6 +44,10 @@
         maxSize => pos_integer,
         encryptionAlgo => {atom, [aes_cfb128]},
         hashAlgo => {atom, [sha256]},
+        directDownload => boolean,
+        directUpload => boolean,
+        directDownloadSecs => pos_integer,
+        directUploadSecs => pos_integer,
         debug => boolean,
         atom() => term()
     }.

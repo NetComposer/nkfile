@@ -32,10 +32,6 @@
 
 -define(CLASS, <<"s3">>).
 
--define(UPLOAD_LINK_TTL_SECS, 5*60).
--define(DOWNLOAD_LINK_TTL_SECS, 5*60).
-
-
 %% ===================================================================
 %% Types
 %% ===================================================================
@@ -61,8 +57,6 @@ nkfile_parse_provider_spec(SrvId, PackageId, #{storageClass:=?CLASS}=Spec) ->
             scheme => {atom, [http, https]},
             host => binary,
             port => pos_integer,
-            uploadLinkTTLSecs => pos_integer,
-            downloadLinkTTLSecs => pos_integer,
             hackney_pool => binary,
             '__mandatory' => [key, secret, bucket]
         },
@@ -110,15 +104,16 @@ nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
 %% @doc
 nkfile_make_upload_link(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
     case
+        (maps:get(directUpload, ProviderSpec, ?FILE_DIRECT_UPLOAD) /= true) orelse
         maps:is_key(encryptionAlgo, ProviderSpec) orelse
         maps:is_key(hashAlgo, ProviderSpec)
     of
         true ->
-            {error, storage_class_invalid};
+            {error, storage_class_incompatible};
         false ->
             {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
             CT = maps:get(contentType, FileMeta),
-            TTL = maps:get(uploadLinkTTLSecs, Config, ?UPLOAD_LINK_TTL_SECS),
+            TTL = maps:get(directUploadSecs, ProviderSpec, ?FILE_DIRECT_UPLOAD_SECS),
             {Verb, Uri} = nkpacket_httpc_s3:make_put_url(Bucket, Path, CT, TTL, Config),
             {ok, Verb, Uri, TTL}
     end;
@@ -130,14 +125,15 @@ nkfile_make_upload_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
 %% @doc
 nkfile_make_download_link(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
     case
+        (maps:get(directDownload, ProviderSpec, ?FILE_DIRECT_DOWNLOAD) /= true) orelse
         maps:is_key(encryptionAlgo, ProviderSpec) orelse
-            maps:is_key(hashAlgo, ProviderSpec)
+        maps:is_key(hashAlgo, ProviderSpec)
     of
         true ->
-            {error, storage_class_invalid};
+            {error, storage_class_incompatible};
         false ->
             {Bucket, Path, Config} = get_config(ProviderSpec, FileMeta),
-            TTL = maps:get(downloadLinkTTLSecs, Config, ?DOWNLOAD_LINK_TTL_SECS),
+            TTL = maps:get(directDownloadSecs, ProviderSpec, ?FILE_DIRECT_DOWNLOAD_SECS),
             {Verb, Uri} = nkpacket_httpc_s3:make_get_url(Bucket, Path, TTL, Config),
             {ok, Verb, Uri, TTL}
     end;

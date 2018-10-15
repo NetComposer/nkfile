@@ -53,6 +53,7 @@ msg(encryption_error)                 -> "Encryption error";
 msg(file_read_error)                  -> "File read error";
 msg(file_too_large)                   -> "File is too large";
 msg(file_write_error)                 -> "File write error";
+msg(storage_class_incompatible)       -> "Storage class incompatible";
 msg(storage_class_invalid)            -> "Storage class invalid";
 msg(storage_class_unknown)            -> "Storage class unknown";
 msg({encryption_algo_unknown, Algo})  -> {"Unknown encryption algorithm: '~s'", [Algo]};
@@ -120,6 +121,8 @@ nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
 
 nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
     {error, storage_class_unknown}.
+
+
 
 
 %% @doc For compatible storage's, generates a temporary upload link

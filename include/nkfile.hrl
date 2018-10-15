@@ -27,6 +27,12 @@
 
 -define(PACKAGE_CLASS_FILE, <<"File">>).
 
+-define(FILE_DIRECT_UPLOAD, false).
+-define(FILE_DIRECT_DOWNLOAD, false).
+-define(FILE_DIRECT_UPLOAD_SECS, 15*60).
+-define(FILE_DIRECT_DOWNLOAD_SECS, 15*60).
+
+
 %% ===================================================================
 %% Records
 %% ===================================================================
