@@ -123,15 +123,13 @@ nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
     {error, storage_class_unknown}.
 
 
-
-
 %% @doc For compatible storage's, generates a temporary upload link
 -spec nkfile_make_upload_link(nkservice:id(), nkservice:package_id(), nkfile:provider_spec(),
     nkfile:file_meta()) ->
     {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()} | continue().
 
 nkfile_make_upload_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
-    {error, storage_class_invalid}.
+    {error, storage_class_incompatible}.
 
 
 %% @doc For compatible storage's, generates a temporary download link
@@ -140,7 +138,7 @@ nkfile_make_upload_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
     {ok, Verb::binary(), Url::binary(), TTL::integer()} | {error, term()} | continue().
 
 nkfile_make_download_link(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
-    {error, storage_class_invalid}.
+    {error, storage_class_incompatible}.
 
 
 %% @doc
