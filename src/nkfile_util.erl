@@ -23,12 +23,10 @@
 -module(nkfile_util).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([parse_provider_spec/1, parse_file_meta/1, encode_body/3, decode_body/3]).
--export([get_url/3]).
+-export([encode_body/3, decode_body/3]).
 
 -include("nkfile.hrl").
--include_lib("nkservice/include/nkservice.hrl").
--include_lib("nkservice/include/nkservice_actor.hrl").
+-include_lib("nkserver/include/nkserver.hrl").
 
 -define(IV, <<"NetComposerFile.">>).
 
@@ -42,52 +40,6 @@
 %% ===================================================================
 %% Public
 %% ===================================================================
-
-
-%% @doc
-parse_provider_spec(Map) ->
-    Syntax = #{
-        id => binary,
-        storageClass => binary,
-        module => module,
-        maxSize => pos_integer,
-        encryptionAlgo => {atom, [aes_cfb128]},
-        hashAlgo => {atom, [sha256]},
-        directDownload => boolean,
-        directUpload => boolean,
-        directDownloadSecs => pos_integer,
-        directUploadSecs => pos_integer,
-        debug => boolean,
-        '__mandatory' => [storageClass],
-        '__allow_unknown' =>true
-    },
-    case nklib_syntax:parse(Map, Syntax) of
-        {ok, Parsed, _} ->
-            {ok, Parsed};
-        {error, Error} ->
-            {error, Error}
-    end.
-
-
-%% @doc Check for valid nkfile:file_meta()
-parse_file_meta(Meta) ->
-    Syntax = #{
-        id => binary,
-        name => binary,
-        contentType => binary,
-        hash => binary,
-        password => binary,
-        path => binary,
-        size => pos_integer,
-        '__mandatory' => [name, contentType],
-        '__allow_unknown' => true
-    },
-    case nklib_syntax:parse(Meta, Syntax) of
-        {ok, Parsed, _} ->
-            {ok, Parsed};
-        {error, Error} ->
-            {error, Error}
-    end.
 
 
 %% @doc
@@ -128,40 +80,6 @@ decode_body(ProviderSpec, FileMeta, File) ->
     end.
 
 
-%% @doc
--spec get_url(#actor_id{}, nkfile:provider_spec(), binary()) ->
-    {ok, CT::binary(), Body::binary()} | {error, term()}.
-
-get_url(ProvActorId, ProviderSpec, Url) ->
-    #actor_id{domain=Domain} = ProvActorId,
-    MaxSize = maps:get(maxSize, ProviderSpec, 0),
-    Opts = [
-        follow_redirect,
-        {pool, Domain}
-    ],
-    case catch hackney:request(get, Url, [], <<>>, Opts) of
-        {ok, 200, Hds, Ref} ->
-            case hackney_headers:parse(<<"content-length">>, Hds) of
-                Size when is_integer(Size) andalso (MaxSize==0 orelse Size =< MaxSize) ->
-                    case hackney_headers:parse(<<"content-type">>, Hds) of
-                        {T1, T2, _} ->
-                            case hackney:body(Ref) of
-                                {ok, Body} ->
-                                    CT = <<T1/binary, $/, T2/binary>>,
-                                    {ok, CT, Body};
-                                {error, Error} ->
-                                    {error, {hackney_error, Error}}
-                            end;
-                        _ ->
-                            {error, file_read_error}
-                    end;
-                _ ->
-                    {error, file_too_large}
-            end;
-        _ ->
-            {error, file_read_error}
-    end.
-
 
 %% ===================================================================
 %% Internal
@@ -170,20 +88,20 @@ get_url(ProvActorId, ProviderSpec, Url) ->
 
 %% @private Check size and adds 'size' param
 check_size(ProviderSpec, FileMeta, Bin) ->
-    MaxSize = maps:get(maxSize, ProviderSpec, 0),
+    MaxSize = maps:get(max_size, ProviderSpec, 0),
     ByteSize = byte_size(Bin),
     case MaxSize==0 orelse byte_size(Bin) =< MaxSize of
         true ->
             {ok, FileMeta#{size=>ByteSize}};
         false ->
-            {error, file_too_large}
+            {error, {file_too_large, maps:get(name, FileMeta, <<>>)}}
     end.
 
 
 
 %% @private Check hash and adds 'hash' param
 set_hash(ProviderSpec, FileMeta, Bin) ->
-    case maps:find(hashAlgo, ProviderSpec) of
+    case maps:find(hash_algo, ProviderSpec) of
         {ok, sha256} ->
             Hash = base64:encode(crypto:hash(sha256, Bin)),
             {ok, FileMeta#{hash => Hash}};
@@ -196,7 +114,7 @@ set_hash(ProviderSpec, FileMeta, Bin) ->
 
 %% @private
 encrypt(ProviderSpec, FileMeta, Bin) ->
-    case maps:find(encryptionAlgo, ProviderSpec) of
+    case maps:find(encryption_algo, ProviderSpec) of
         {ok, aes_cfb128} ->
             Start = nklib_date:epoch(usecs),
             Pass = case maps:find(password, FileMeta) of
@@ -207,7 +125,7 @@ encrypt(ProviderSpec, FileMeta, Bin) ->
             end,
             case catch crypto:block_encrypt(aes_cfb128, Pass, ?IV, Bin) of
                 {'EXIT', _} ->
-                    {error, encryption_error};
+                    {error, file_encryption_error};
                 Bin2 ->
                     FileMeta2 = FileMeta#{password => base64:encode(Pass)},
                     Meta = #{crypt_usecs => nklib_date:epoch(usecs) - Start},
@@ -222,7 +140,7 @@ encrypt(ProviderSpec, FileMeta, Bin) ->
 
 %% @private
 decrypt(ProviderSpec, FileMeta, Bin) ->
-    case maps:find(encryptionAlgo, ProviderSpec) of
+    case maps:find(encryption_algo, ProviderSpec) of
         {ok, aes_cfb128} ->
             case FileMeta of
                 #{password:=Pass} ->
@@ -230,7 +148,7 @@ decrypt(ProviderSpec, FileMeta, Bin) ->
                     Pass2 = base64:decode(Pass),
                     case catch crypto:block_decrypt(aes_cfb128, Pass2, ?IV, Bin) of
                         {'EXIT', _} ->
-                            {error, decryption_error};
+                            {error, file_decryption_error};
                         Bin2 ->
                             Meta2 = #{
                                 crypt_usecs => nklib_date:epoch(usecs) - Start
@@ -249,7 +167,7 @@ decrypt(ProviderSpec, FileMeta, Bin) ->
 
 %% @private
 check_hash(ProviderSpec, FileMeta, Bin) ->
-    case maps:find(hashAlgo, ProviderSpec) of
+    case maps:find(hash_algo, ProviderSpec) of
         {ok, sha256} ->
             case FileMeta of
                 #{hash:=Hash1} ->

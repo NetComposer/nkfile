@@ -26,9 +26,8 @@
 -export([nkfile_parse_provider_spec/3, nkfile_upload/5, nkfile_download/4, nkfile_delete/4]).
 
 -include("nkfile.hrl").
--include_lib("nkservice/include/nkservice.hrl").
 
--define(CLASS, <<"filesystem">>).
+-define(CLASS, nkfile_filesystem).
 
 
 %% ===================================================================
@@ -37,62 +36,61 @@
 
 
 %% @doc
-nkfile_parse_provider_spec(SrvId, PackageId, #{storageClass:=?CLASS}=Spec) ->
+nkfile_parse_provider_spec(SrvId, ?CLASS, Spec) ->
     Syntax = #{
-        filesystemConfig => #{
-            filePath => binary,
-            '__mandatory' => [filePath]
+        filesystem_config => #{
+            file_path => binary,
+            '__mandatory' => [file_path]
         },
-        '__mandatory' => [filesystemConfig],
-        '__allow_unknown' => true
+        '__mandatory' => [filesystem_config]
     },
-    case nklib_syntax:parse(Spec, Syntax) of
-        {ok, Parsed, _} ->
-            {continue, [SrvId, PackageId, Parsed]};
+    case nklib_syntax:parse_all(Spec, Syntax) of
+        {ok, Parsed} ->
+            {continue, [SrvId, ?CLASS, Parsed]};
         {error, Error} ->
             {error, Error}
     end;
 
-nkfile_parse_provider_spec(_SrvId, _PackageId, _Spec) ->
+nkfile_parse_provider_spec(_SrvId, _Class, _Spec) ->
     continue.
 
 
 %% @doc
-nkfile_upload(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta, Bin) ->
+nkfile_upload(_SrvId, ?CLASS, ProviderSpec, FileMeta, Bin) ->
     Path = get_path(ProviderSpec, FileMeta),
     case file:write_file(Path, Bin) of
         ok ->
             {ok, #{file_path=>Path}};
         {error, Error} ->
             lager:warning("write error at ~s: ~p", [Path, Error]),
-            {error, file_write_error}
+            {error, {file_write_error, Path}}
     end;
 
-nkfile_upload(_SrvId, _PackageId, _ProviderSpec, _FileMeta, _Bin) ->
+nkfile_upload(_SrvId, _Class, _ProviderSpec, _FileMeta, _Bin) ->
     continue.
 
 
 %% @doc
-nkfile_download(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
+nkfile_download(_SrvId, ?CLASS, ProviderSpec, FileMeta) ->
     Path = get_path(ProviderSpec, FileMeta),
     case file:read_file(Path) of
         {ok, Body} ->
             {ok, Body, #{file_path=>Path}};
         {error, Error} ->
             lager:warning("read error at ~s: ~p", [Path, Error]),
-            {error, file_read_error}
+            {error, {file_read_error, Path}}
     end;
 
-nkfile_download(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+nkfile_download(_SrvId, _Class, _ProviderSpec, _FileMeta) ->
     continue.
 
 
 %% @doc
-nkfile_delete(_SrvId, _PackageId, #{storageClass:=?CLASS}=ProviderSpec, FileMeta) ->
+nkfile_delete(_SrvId, ?CLASS, ProviderSpec, FileMeta) ->
     Path = get_path(ProviderSpec, FileMeta),
     file:delete(Path);
 
-nkfile_delete(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
+nkfile_delete(_SrvId, _Class, _ProviderSpec, _FileMeta) ->
     continue.
 
 
@@ -102,6 +100,6 @@ nkfile_delete(_SrvId, _PackageId, _ProviderSpec, _FileMeta) ->
 
 get_path(ProviderSpec, FileMeta) ->
     #{name:=Name} = FileMeta,
-    #{filesystemConfig:=#{filePath:=FilePath}} = ProviderSpec,
+    #{filesystem_config:=#{file_path:=FilePath}} = ProviderSpec,
     filename:join([<<"/">>, FilePath, Name]).
 

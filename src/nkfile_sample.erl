@@ -66,8 +66,8 @@ luerl_test_1() ->
 
 s1() -> <<"
     fileConfig = {
-        storageClass = 'filesystem',
-        filePath = '/tmp'
+        storage_class = 'filesystem',
+        file_path = '/tmp'
     }
 
     file2 = startPackage('File', fileConfig)
@@ -89,14 +89,14 @@ s1() -> <<"
 test_filesystem() ->
     BaseProvider1 = #{
         id => test_fs_2a,
-        storageClass => filesystem,
-        hashAlgo => sha256,
-        filesystemConfig => #{
-            filePath => "/tmp"
+        storage_class => filesystem,
+        hash_algo => sha256,
+        filesystem_config => #{
+            file_path => "/tmp"
         }
     },
     {ok, Provider1} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider1),
-    FileMeta = #{name=>n1, contentType=>any},
+    FileMeta = #{name=>n1, content_type=>any},
     SHA1 = base64:encode(crypto:hash(sha256, <<"123">>)),
     {ok, #{hash:=SHA1}, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, Provider1, FileMeta, <<"123">>),
     {error, hash_is_missing} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
@@ -105,11 +105,11 @@ test_filesystem() ->
 
     BaseProvider2 = #{
         id => test_fs_2b,
-        storageClass => filesystem,
-        hashAlgo => sha256,
-        encryptionAlgo => aes_cfb128,
-        filesystemConfig => #{
-            filePath => "/tmp"
+        storage_class => filesystem,
+        hash_algo => sha256,
+        encryption_algo => aes_cfb128,
+        filesystem_config => #{
+            file_path => "/tmp"
         }
     },
     {ok, Provider2} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider2),
@@ -131,10 +131,10 @@ test_filesystem() ->
 test_s3() ->
     BaseProvider = #{
         id => test_s3_2a,
-        storageClass => s3,
-        encryptionAlgo => aes_cfb128,
+        storage_class => s3,
+        encryption_algo => aes_cfb128,
         debug => true,
-        s3Config => #{
+        s3_config => #{
             scheme => http,
             host => localhost,
             port => 9000,
@@ -145,7 +145,7 @@ test_s3() ->
         }
     },
     {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
-    FileMeta = #{name=>n3, contentType=>any},
+    FileMeta = #{name=>n3, content_type=>any},
     {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
     {ok, <<"321">>, #{s3_headers:=_}} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}),
     ok.

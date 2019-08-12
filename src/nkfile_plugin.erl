@@ -19,14 +19,11 @@
 %% -------------------------------------------------------------------
 
 %% @doc NkFILE callbacks
-%% Stores in cache
-%% - {class_module, StorageClass} -> module()
-
 
 -module(nkfile_plugin).
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
--export([plugin_deps/0, plugin_api/1]).
+-export([plugin_deps/0]).
 -include("nkfile.hrl").
 
 -define(LLOG(Type, Txt, Args),lager:Type("NkFILE "++Txt, Args)).
@@ -43,14 +40,12 @@ plugin_deps() ->
 	[].
 
 
-%% @doc
-plugin_api(?PACKAGE_CLASS_FILE) ->
-	#{
-		luerl => #{
-			upload => {nkfile, luerl_upload},
-            download => {nkfile, luerl_download}
-		}
-	};
+%%%% @doc
+%%plugin_api(?PACKAGE_CLASS_FILE) ->
+%%	#{
+%%		luerl => #{
+%%			upload => {nkfile, luerl_upload},
+%%            download => {nkfile, luerl_download}
+%%		}
+%%	};
 
-plugin_api(_Class) ->
-	#{}.

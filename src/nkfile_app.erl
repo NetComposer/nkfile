@@ -41,7 +41,7 @@
     ok | {error, Reason::term()}.
 
 start() ->
-    case nklib_util:ensure_all_started(?APP, permanent) of
+    case application:ensure_all_started(?APP, permanent) of
         {ok, _Started} ->
             ok;
         Error ->
@@ -55,7 +55,6 @@ start(_Type, _Args) ->
         {ok, _} ->
             {ok, Vsn} = application:get_key(?APP, vsn),
             lager:info("NkFILE v~s is starting", [Vsn]),
-            ok = nkservice_util:register_package_class(?PACKAGE_CLASS_FILE, nkfile),
             {ok, Pid} = nkfile_sup:start_link(),
             {ok, Pid};
         {error, Error} ->

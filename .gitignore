@@ -1,2 +1,4 @@
 ebin
 .rebar3
+/_build
+/nkfile.version
