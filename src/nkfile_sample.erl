@@ -33,23 +33,9 @@
 %% @doc Starts the service
 start() ->
     Spec = #{
-        plugins => [nkfile_filesystem, nkfile_s3],
-        packages => [
-            #{
-                id => file_pkg,
-                class => 'File'
-            }
-        ]
-%%        modules => [
-%%            #{
-%%                id => s1,
-%%                class => luerl,
-%%                code => s1(),
-%%                debug => true
-%%            }
-%%        ]
+        plugins => [nkfile_filesystem, nkfile_s3]
     },
-    nkservice:start(?SRV, Spec).
+    nkserver:start_link(nkfile, ?SRV, Spec).
 
 % export MINIO_ACCESS_KEY=5UBED0Q9FB7MFZ5EWIOJ; export MINIO_SECRET_KEY=CaK4frX0uixBOh16puEsWEvdjQ3X3RTDvkvE+tUI; minio server .
 
@@ -57,72 +43,73 @@ start() ->
 
 %% @doc Stops the service
 stop() ->
-    nkservice:stop(?SRV).
+    nkserver:stop(?SRV).
 
 
-luerl_test_1() ->
-    nkservice_luerl_instance:call({?SRV, s1, main}, [test_1], []).
-
-
-s1() -> <<"
-    fileConfig = {
-        storage_class = 'filesystem',
-        file_path = '/tmp'
-    }
-
-    file2 = startPackage('File', fileConfig)
-
-    function test_1()
-        result, meta1 = file2.upload('123', {name='test1'})
-        if result == 'ok' then
-            body, meta2 = file2.download({name='test1'})
-            return body, meta2
-        else
-            return 'error'
-        end
-    end
-
-">>.
+%%luerl_test_1() ->
+%%    nkservice_luerl_instance:call({?SRV, s1, main}, [test_1], []).
+%%
+%%
+%%s1() -> <<"
+%%    fileConfig = {
+%%        storage_class = 'filesystem',
+%%        file_path = '/tmp'
+%%    }
+%%
+%%    file2 = startPackage('File', fileConfig)
+%%
+%%    function test_1()
+%%        result, meta1 = file2.upload('123', {name='test1'})
+%%        if result == 'ok' then
+%%            body, meta2 = file2.download({name='test1'})
+%%            return body, meta2
+%%        else
+%%            return 'error'
+%%        end
+%%    end
+%%
+%%">>.
 
 
 % Test filesystem with external config
 test_filesystem() ->
     BaseProvider1 = #{
+        storage_class => nkfile_filesystem,
         id => test_fs_2a,
-        storage_class => filesystem,
         hash_algo => sha256,
         filesystem_config => #{
             file_path => "/tmp"
         }
     },
-    {ok, Provider1} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider1),
-    FileMeta = #{name=>n1, content_type=>any},
+    {ok, Provider1} = nkfile:parse_provider_spec(?SRV, BaseProvider1),
+    {ok, FileMeta} = nkfile:parse_file_meta(?SRV, #{name=>n1, content_type=>any}),
+
     SHA1 = base64:encode(crypto:hash(sha256, <<"123">>)),
-    {ok, #{hash:=SHA1}, #{file_path:=_}} = nkfile:upload(?SRV, file_pkg, Provider1, FileMeta, <<"123">>),
-    {error, hash_is_missing} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta),
+    {ok, #{hash:=SHA1}, #{file_path:=_}} = nkfile:upload(?SRV, Provider1, FileMeta, <<"123">>),
+    {error, hash_is_missing} = nkfile:download(?SRV, Provider1, FileMeta),
     {ok, <<"123">>} = file:read_file("/tmp/n1"),
-    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, file_pkg, Provider1, FileMeta#{hash=>SHA1}),
+    {ok, <<"123">>, #{file_path:=_}} = nkfile:download(?SRV, Provider1, FileMeta#{hash=>SHA1}),
 
     BaseProvider2 = #{
         id => test_fs_2b,
-        storage_class => filesystem,
+        storage_class => nkfile_filesystem,
         hash_algo => sha256,
-        encryption_algo => aes_cfb128,
+        encryption_algo => <<"aes_cfb128">>,
         filesystem_config => #{
             file_path => "/tmp"
         }
     },
-    {ok, Provider2} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider2),
+    {ok, Provider2} = nkfile:parse_provider_spec(?SRV, BaseProvider2),
     SHA2 = base64:encode(crypto:hash(sha256, <<"321">>)),
-    {ok, #{password:=Pass, hash:=SHA2}, #{crypt_usecs:=_}} = nkfile:upload(?SRV, file_pkg, Provider2, FileMeta, <<"321">>),
+    {ok, #{password:=Pass, hash:=SHA2}, #{crypt_usecs:=_}} = nkfile:upload(?SRV, Provider2, FileMeta, <<"321">>),
 
-    {error, password_missing} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta),
-    {ok, <<"321">>, _} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
+    {error, password_missing} = nkfile:download(?SRV, Provider2, FileMeta),
+    {ok, <<"321">>, _} = nkfile:download(?SRV, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
     {ok, Enc} = file:read_file("/tmp/n1"),
     true = Enc /= <<"321">>,
 
-        ok = file:write_file("/tmp/n1", <<"abc">>),
-    {error, hash_invalid} = nkfile:download(?SRV, file_pkg, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
+    ok = file:write_file("/tmp/n1", <<"abc">>),
+    {error, hash_invalid} = nkfile:download(?SRV, Provider2, FileMeta#{password=>Pass, hash=>SHA2}),
     ok.
 
 
@@ -130,8 +117,8 @@ test_filesystem() ->
 % Test s3 with external config
 test_s3() ->
     BaseProvider = #{
+        storage_class => nkfile_s3,
         id => test_s3_2a,
-        storage_class => s3,
         encryption_algo => aes_cfb128,
         debug => true,
         s3_config => #{
@@ -144,9 +131,9 @@ test_s3() ->
             hackney_pool => pool1
         }
     },
-    {ok, Provider} = nkfile:parse_provider_spec(?SRV, file_pkg, BaseProvider),
-    FileMeta = #{name=>n3, content_type=>any},
-    {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, file_pkg, Provider, FileMeta, <<"321">>),
-    {ok, <<"321">>, #{s3_headers:=_}} = nkfile:download(?SRV, file_pkg, Provider, FileMeta#{password=>Pass}),
+    {ok, Provider} = nkfile:parse_provider_spec(?SRV, BaseProvider),
+    {ok, FileMeta} = nkfile:parse_file_meta(?SRV, #{name=>n3, content_type=>any}),
+    {ok, #{password:=Pass}, _} = nkfile:upload(?SRV, Provider, FileMeta, <<"321">>),
+    {ok, <<"321">>, #{s3_headers:=_}} = nkfile:download(?SRV, Provider, FileMeta#{password=>Pass}),
     ok.
 

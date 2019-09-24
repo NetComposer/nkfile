@@ -98,11 +98,10 @@ check_size(ProviderSpec, FileMeta, Bin) ->
     end.
 
 
-
 %% @private Check hash and adds 'hash' param
 set_hash(ProviderSpec, FileMeta, Bin) ->
     case maps:find(hash_algo, ProviderSpec) of
-        {ok, sha256} ->
+        {ok, <<"sha256">>} ->
             Hash = base64:encode(crypto:hash(sha256, Bin)),
             {ok, FileMeta#{hash => Hash}};
         {ok, Other} ->
@@ -115,7 +114,7 @@ set_hash(ProviderSpec, FileMeta, Bin) ->
 %% @private
 encrypt(ProviderSpec, FileMeta, Bin) ->
     case maps:find(encryption_algo, ProviderSpec) of
-        {ok, aes_cfb128} ->
+        {ok, <<"aes_cfb128">>} ->
             Start = nklib_date:epoch(usecs),
             Pass = case maps:find(password, FileMeta) of
                 error ->
@@ -141,7 +140,7 @@ encrypt(ProviderSpec, FileMeta, Bin) ->
 %% @private
 decrypt(ProviderSpec, FileMeta, Bin) ->
     case maps:find(encryption_algo, ProviderSpec) of
-        {ok, aes_cfb128} ->
+        {ok, <<"aes_cfb128">>} ->
             case FileMeta of
                 #{password:=Pass} ->
                     Start = nklib_date:epoch(usecs),
@@ -168,7 +167,7 @@ decrypt(ProviderSpec, FileMeta, Bin) ->
 %% @private
 check_hash(ProviderSpec, FileMeta, Bin) ->
     case maps:find(hash_algo, ProviderSpec) of
-        {ok, sha256} ->
+        {ok, <<"sha256">>} ->
             case FileMeta of
                 #{hash:=Hash1} ->
                     Hash2 = base64:decode(Hash1),

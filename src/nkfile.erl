@@ -41,8 +41,8 @@
         id := binary(),
         storage_class := storage_class(),
         max_size => pos_integer,
-        encryption_algo => {atom, [aes_cfb128]},
-        hash_algo => {atom, [sha256]},
+        encryption_algo => binary,          % aes_cfb128
+        hash_algo => binary,                % sha256
         direct_download => boolean,
         direct_upload => boolean,
         direct_download_secs => pos_integer,
@@ -91,9 +91,9 @@
 
 parse_file_meta(SrvId, Meta) ->
     Syntax = #{
-        id => binary,
         name => binary,
         content_type => binary,
+        id => binary,
         hash => binary,
         password => binary,
         path => binary,
@@ -114,15 +114,15 @@ parse_file_meta(SrvId, Meta) ->
 
 parse_provider_spec(SrvId, Spec) ->
     Syntax = #{
-        id => binary,
         storage_class => atom,
         module => module,
+        id => binary,
         max_size => pos_integer,
-        encryption_algo => {atom, [aes_cfb128]},
-        hash_algo => {atom, [sha256]},
+        encryption_algo => binary,              % aes_cfb128
+        hash_algo => binary,                    % sha256
         direct_download => boolean,
-        direct_upload => boolean,
         direct_download_secs => pos_integer,
+        direct_upload => boolean,
         direct_upload_secs => pos_integer,
         debug => boolean,
         '__mandatory' => [storage_class]

@@ -24,7 +24,7 @@
 -author('Carlos Gonzalez <carlosj.gf@gmail.com>').
 
 -export([status/1]).
--export([nkfile_parse_file_meta/3, nkfile_parse_provider_spec/3]).
+-export([nkfile_parse_file_meta/2, nkfile_parse_provider_spec/3]).
 -export([nkfile_encode_body/5, nkfile_decode_body/5, nkfile_upload/5, nkfile_download/4]).
 -export([nkfile_make_upload_link/4, nkfile_make_download_link/4]).
 -export([nkfile_get_file_meta/4, nkfile_delete/4]).
@@ -66,10 +66,10 @@ status(_)                                -> continue.
 
 
 %% @doc Check for valid nkfile:file_meta()
--spec nkfile_parse_file_meta(nkserver:id(), class(), map()) ->
+-spec nkfile_parse_file_meta(nkserver:id(), map()) ->
     {ok, nkfile:file_meta()} | {error, term()} | continue().
 
-nkfile_parse_file_meta(_SrvId, _Class, Meta) ->
+nkfile_parse_file_meta(_SrvId, Meta) ->
     {ok, Meta}.
 
 

@@ -38,14 +38,3 @@
 %% @doc
 plugin_deps() ->
 	[].
-
-
-%%%% @doc
-%%plugin_api(?PACKAGE_CLASS_FILE) ->
-%%	#{
-%%		luerl => #{
-%%			upload => {nkfile, luerl_upload},
-%%            download => {nkfile, luerl_download}
-%%		}
-%%	};
-
