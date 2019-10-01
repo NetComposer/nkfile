@@ -101,5 +101,5 @@ nkfile_delete(_SrvId, _Class, _ProviderSpec, _FileMeta) ->
 get_path(ProviderSpec, FileMeta) ->
     #{name:=Name} = FileMeta,
     #{filesystem_config:=#{file_path:=FilePath}} = ProviderSpec,
-    filename:join([<<"/">>, FilePath, Name]).
+    filename:join([FilePath, Name]).
 
